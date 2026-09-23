@@ -38,6 +38,56 @@ from app.database.database import (
 )
 
 
+from app.monitoring.failure_recovery import (
+    NetworkFailureRecoveryTracker,
+    process_ping_result
+)
+
+
+# ==========================================
+# Failure & Recovery Tracker
+# ==========================================
+
+_trackers = {}
+
+
+def get_failure_recovery_tracker(host):
+    """
+    Return the persistent failure/recovery tracker
+    for a specific host.
+
+    A separate tracker is maintained for each host
+    so that availability transitions can be detected
+    across repeated monitoring tests.
+    """
+
+    if host not in _trackers:
+
+        _trackers[host] = (
+            NetworkFailureRecoveryTracker()
+        )
+
+    return _trackers[host]
+
+
+def reset_failure_recovery_tracker(host=None):
+    """
+    Reset failure/recovery tracking.
+
+    If host is provided, only that host is reset.
+
+    If host is None, all trackers are reset.
+    """
+
+    if host is None:
+
+        _trackers.clear()
+
+    elif host in _trackers:
+
+        _trackers[host].reset()
+
+
 def monitor_once(
     host,
     count=4
@@ -58,6 +108,8 @@ def monitor_once(
     Health Score
       ↓
     Anomaly Detection
+      ↓
+    Failure & Recovery Detection
       ↓
     Recommendations
       ↓
@@ -123,6 +175,20 @@ def monitor_once(
 
 
     # --------------------------------------
+    # Failure & Recovery Detection
+    # --------------------------------------
+
+    failure_recovery_tracker = (
+        get_failure_recovery_tracker(host)
+    )
+
+    failure_recovery = process_ping_result(
+        failure_recovery_tracker,
+        ping_result
+    )
+
+
+    # --------------------------------------
     # Generate recommendations
     # --------------------------------------
 
@@ -143,7 +209,8 @@ def monitor_once(
             metrics,
             analysis,
             health_score,
-            anomaly_result
+            anomaly_result,
+            failure_recovery
         )
 
         database_id = database_record.id
@@ -165,6 +232,8 @@ def monitor_once(
         "health_score": health_score,
 
         "anomaly": anomaly_result,
+
+        "failure_recovery": failure_recovery,
 
         "recommendations": recommendations,
 

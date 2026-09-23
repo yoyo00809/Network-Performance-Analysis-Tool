@@ -18,6 +18,11 @@ from app.database.database import (
     get_test_history,
 )
 
+from app.analysis.trend_analysis import (
+    analyze_historical_tests,
+    get_metric_series,
+)
+
 from app.reports.report_generator import (
     generate_text_report,
     save_text_report,
@@ -43,12 +48,12 @@ class NPATDashboard:
         )
 
         self.root.geometry(
-            "1200x900"
+            "1200x1000"
         )
 
         self.root.minsize(
             1100,
-            800
+            900
         )
 
         # ----------------------------------
@@ -383,6 +388,24 @@ class NPATDashboard:
             padx=5
         )
 
+        # ----------------------------------
+        # Historical Trends Button
+        # ----------------------------------
+
+        trend_button = tk.Button(
+            section,
+            text="HISTORICAL TRENDS",
+            font=("Arial", 10, "bold"),
+            command=self.show_historical_trends,
+            padx=15,
+            pady=7
+        )
+
+        trend_button.pack(
+            side="left",
+            padx=5
+        )
+
     # ======================================
     # Performance Chart
     # ======================================
@@ -398,14 +421,22 @@ class NPATDashboard:
         )
 
         section.pack(
-            fill="both",
-            expand=True,
+            fill="x",
+            expand=False,
             padx=25,
             pady=8
         )
 
+        section.configure(
+            height=250
+        )
+
+        section.pack_propagate(
+            False
+        )
+
         self.figure = Figure(
-            figsize=(8, 3),
+            figsize=(8, 2.4),
             dpi=100
         )
 
@@ -585,7 +616,6 @@ class NPATDashboard:
         self.anomaly_text.pack(
             fill="x"
         )
-
 
     # ======================================
     # Recommendations Section
@@ -1240,13 +1270,18 @@ class NPATDashboard:
 
         for record in history_data:
 
-            health_score = record["health_score"]
+            health_score = record[
+                "health_score"
+            ]
 
             if health_score is not None:
+
                 health_score_display = (
                     f"{health_score} / 100"
                 )
+
             else:
+
                 health_score_display = "--"
 
             tree.insert(
@@ -1293,6 +1328,522 @@ class NPATDashboard:
             )
 
     # ======================================
+    # Historical Trend Analysis
+    # ======================================
+
+    def show_historical_trends(self):
+
+        try:
+
+            # ----------------------------------
+            # Load Historical Database Records
+            # ----------------------------------
+
+            app = create_database()
+
+            with app.app_context():
+
+                history = get_test_history(
+                    limit=50
+                )
+
+                trend_data = analyze_historical_tests(
+                    history
+                )
+
+                metric_series = get_metric_series(
+                    history
+                )
+
+        except Exception as error:
+
+            messagebox.showerror(
+                "Historical Trend Error",
+                f"Unable to load historical trends:\n\n{error}"
+            )
+
+            return
+
+        # ----------------------------------
+        # Create Trend Window
+        # ----------------------------------
+
+        trend_window = tk.Toplevel(
+            self.root
+        )
+
+        trend_window.title(
+            "NPAT - Historical Trend Analysis"
+        )
+
+        trend_window.geometry(
+            "1250x850"
+        )
+
+        trend_window.minsize(
+            1000,
+            700
+        )
+
+        # ----------------------------------
+        # Heading
+        # ----------------------------------
+
+        heading = tk.Label(
+            trend_window,
+            text="HISTORICAL TREND ANALYSIS",
+            font=("Arial", 20, "bold")
+        )
+
+        heading.pack(
+            pady=(15, 5)
+        )
+
+        subtitle = tk.Label(
+            trend_window,
+            text=(
+                "Analysis of recent network performance "
+                "test history"
+            ),
+            font=("Arial", 10)
+        )
+
+        subtitle.pack(
+            pady=(0, 10)
+        )
+
+        # ----------------------------------
+        # Summary Section
+        # ----------------------------------
+
+        summary_frame = tk.Frame(
+            trend_window,
+            padx=15,
+            pady=5
+        )
+
+        summary_frame.pack(
+            fill="x"
+        )
+
+        total_tests = trend_data[
+            "total_tests"
+        ]
+
+        available = trend_data[
+            "availability"
+        ]["available"]
+
+        unavailable = trend_data[
+            "availability"
+        ]["unavailable"]
+
+        failure_events = trend_data[
+            "failure_events"
+        ]
+
+        recovery_events = trend_data[
+            "recovery_events"
+        ]
+
+        summary_items = [
+            (
+                "TOTAL TESTS",
+                str(total_tests)
+            ),
+            (
+                "AVAILABLE",
+                str(available)
+            ),
+            (
+                "UNAVAILABLE",
+                str(unavailable)
+            ),
+            (
+                "FAILURES",
+                str(failure_events)
+            ),
+            (
+                "RECOVERIES",
+                str(recovery_events)
+            ),
+        ]
+
+        for title, value in summary_items:
+
+            card = tk.Frame(
+                summary_frame,
+                relief="ridge",
+                borderwidth=2,
+                padx=15,
+                pady=8
+            )
+
+            card.pack(
+                side="left",
+                expand=True,
+                fill="both",
+                padx=5
+            )
+
+            tk.Label(
+                card,
+                text=title,
+                font=("Arial", 9, "bold")
+            ).pack()
+
+            tk.Label(
+                card,
+                text=value,
+                font=("Arial", 17, "bold")
+            ).pack(
+                pady=(4, 0)
+            )
+
+        # ----------------------------------
+        # Statistics Section
+        # ----------------------------------
+
+        statistics_frame = tk.LabelFrame(
+            trend_window,
+            text="Historical Statistics",
+            font=("Arial", 11, "bold"),
+            padx=15,
+            pady=10
+        )
+
+        statistics_frame.pack(
+            fill="x",
+            padx=20,
+            pady=10
+        )
+
+        columns = (
+            "Metric",
+            "Average",
+            "Minimum",
+            "Maximum",
+            "Samples"
+        )
+
+        statistics_tree = ttk.Treeview(
+            statistics_frame,
+            columns=columns,
+            show="headings",
+            height=5
+        )
+
+        for column in columns:
+
+            statistics_tree.heading(
+                column,
+                text=column
+            )
+
+        statistics_tree.column(
+            "Metric",
+            width=180,
+            anchor="center"
+        )
+
+        statistics_tree.column(
+            "Average",
+            width=150,
+            anchor="center"
+        )
+
+        statistics_tree.column(
+            "Minimum",
+            width=150,
+            anchor="center"
+        )
+
+        statistics_tree.column(
+            "Maximum",
+            width=150,
+            anchor="center"
+        )
+
+        statistics_tree.column(
+            "Samples",
+            width=100,
+            anchor="center"
+        )
+
+        def format_value(value):
+
+            if value is None:
+                return "--"
+
+            return str(value)
+
+        statistics_rows = [
+            (
+                "Latency (ms)",
+                trend_data["latency"]
+            ),
+            (
+                "Jitter (ms)",
+                trend_data["jitter"]
+            ),
+            (
+                "Packet Loss (%)",
+                trend_data["packet_loss"]
+            ),
+            (
+                "Health Score",
+                trend_data["health_score"]
+            ),
+        ]
+
+        for metric_name, values in statistics_rows:
+
+            statistics_tree.insert(
+                "",
+                tk.END,
+                values=(
+                    metric_name,
+                    format_value(
+                        values["average"]
+                    ),
+                    format_value(
+                        values["minimum"]
+                    ),
+                    format_value(
+                        values["maximum"]
+                    ),
+                    values["count"]
+                )
+            )
+
+        statistics_tree.pack(
+            fill="x",
+            expand=True
+        )
+
+        # ----------------------------------
+        # Historical Charts
+        # ----------------------------------
+
+        chart_frame = tk.LabelFrame(
+            trend_window,
+            text="Performance Trends",
+            font=("Arial", 11, "bold"),
+            padx=10,
+            pady=10
+        )
+
+        chart_frame.pack(
+            fill="both",
+            expand=True,
+            padx=20,
+            pady=5
+        )
+
+        trend_figure = Figure(
+            figsize=(10, 4.5),
+            dpi=100
+        )
+
+        trend_ax = trend_figure.add_subplot(
+            111
+        )
+
+        latency_series = metric_series[
+            "latency"
+        ]
+
+        jitter_series = metric_series[
+            "jitter"
+        ]
+
+        packet_loss_series = metric_series[
+            "packet_loss"
+        ]
+
+        health_series = metric_series[
+            "health_score"
+        ]
+
+        # Database history is returned newest-first.
+        # Reverse it so the chart reads oldest -> newest.
+
+        latency_series = list(
+            reversed(latency_series)
+        )
+
+        jitter_series = list(
+            reversed(jitter_series)
+        )
+
+        packet_loss_series = list(
+            reversed(packet_loss_series)
+        )
+
+        health_series = list(
+            reversed(health_series)
+        )
+
+        test_numbers = list(
+            range(
+                1,
+                len(history) + 1
+            )
+        )
+
+        plotted = False
+
+        # ----------------------------------
+        # Latency
+        # ----------------------------------
+
+        if any(
+            value is not None
+            for value in latency_series
+        ):
+
+            trend_ax.plot(
+                test_numbers,
+                latency_series,
+                marker="o",
+                linewidth=2,
+                label="Latency (ms)"
+            )
+
+            plotted = True
+
+        # ----------------------------------
+        # Jitter
+        # ----------------------------------
+
+        if any(
+            value is not None
+            for value in jitter_series
+        ):
+
+            trend_ax.plot(
+                test_numbers,
+                jitter_series,
+                marker="o",
+                linewidth=2,
+                label="Jitter (ms)"
+            )
+
+            plotted = True
+
+        # ----------------------------------
+        # Packet Loss
+        # ----------------------------------
+
+        if any(
+            value is not None
+            for value in packet_loss_series
+        ):
+
+            trend_ax.plot(
+                test_numbers,
+                packet_loss_series,
+                marker="o",
+                linewidth=2,
+                label="Packet Loss (%)"
+            )
+
+            plotted = True
+
+        trend_ax.set_title(
+            "Latency, Jitter and Packet Loss Trend"
+        )
+
+        trend_ax.set_xlabel(
+            "Test Number"
+        )
+
+        trend_ax.set_ylabel(
+            "Metric Value"
+        )
+
+        trend_ax.grid(
+            True
+        )
+
+        if plotted:
+
+            trend_ax.legend()
+
+        else:
+
+            trend_ax.text(
+                0.5,
+                0.5,
+                "No historical metric data available",
+                horizontalalignment="center",
+                verticalalignment="center",
+                transform=trend_ax.transAxes
+            )
+
+        trend_figure.tight_layout()
+
+        trend_canvas = FigureCanvasTkAgg(
+            trend_figure,
+            master=chart_frame
+        )
+
+        trend_canvas.draw()
+
+        trend_canvas.get_tk_widget().pack(
+            fill="both",
+            expand=True
+        )
+
+        # ----------------------------------
+        # Health Score Information
+        # ----------------------------------
+
+        health_frame = tk.Frame(
+            trend_window,
+            padx=20,
+            pady=8
+        )
+
+        health_frame.pack(
+            fill="x"
+        )
+
+        health_values = [
+            value
+            for value in health_series
+            if value is not None
+        ]
+
+        if health_values:
+
+            health_text = (
+                f"Health Score Trend  |  "
+                f"Average: "
+                f"{trend_data['health_score']['average']}  |  "
+                f"Minimum: "
+                f"{trend_data['health_score']['minimum']}  |  "
+                f"Maximum: "
+                f"{trend_data['health_score']['maximum']}"
+            )
+
+        else:
+
+            health_text = (
+                "Health Score Trend  |  "
+                "No data available"
+            )
+
+        tk.Label(
+            health_frame,
+            text=health_text,
+            font=("Arial", 10, "bold"),
+            anchor="w"
+        ).pack(
+            fill="x"
+        )
+
+    # ======================================
     # Open TXT Report
     # ======================================
 
@@ -1318,7 +1869,9 @@ class NPATDashboard:
 
         try:
 
-            os.startfile(filepath)
+            os.startfile(
+                filepath
+            )
 
         except Exception as error:
 
@@ -1353,7 +1906,9 @@ class NPATDashboard:
 
         try:
 
-            os.startfile(filepath)
+            os.startfile(
+                filepath
+            )
 
         except Exception as error:
 
@@ -1391,10 +1946,13 @@ def run_dashboard():
 
     root = tk.Tk()
 
-    NPATDashboard(root)
+    NPATDashboard(
+        root
+    )
 
     root.mainloop()
 
 
 if __name__ == "__main__":
+
     run_dashboard()

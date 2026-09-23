@@ -265,3 +265,153 @@ def test_save_network_test_with_anomaly():
         # Clean up test record
         db.session.delete(test)
         db.session.commit()
+
+
+# ==========================================
+# Failure & Recovery Database Tests
+# ==========================================
+
+def test_save_network_test_with_failure_recovery():
+
+    app = create_database()
+
+    metrics = {
+        "packets_sent": 4,
+        "packets_received": 0,
+        "packet_loss": 100.0,
+        "latency_average": None,
+        "latency_minimum": None,
+        "latency_maximum": None,
+        "jitter": None,
+    }
+
+    analysis = {
+        "latency_status": "Unavailable",
+        "jitter_status": "Unavailable",
+        "packet_loss_status": "Poor",
+        "overall_status": "Poor",
+    }
+
+    failure_recovery = {
+        "state": "Unavailable",
+        "failure_detected": True,
+        "recovery_detected": False,
+        "failure_count": 1,
+        "failure_duration_seconds": None,
+    }
+
+    with app.app_context():
+
+        test = save_network_test(
+            "failure-test.example",
+            metrics,
+            analysis,
+            failure_recovery=failure_recovery
+        )
+
+        assert test.id is not None
+        assert test.host == "failure-test.example"
+
+        assert test.network_state == "Unavailable"
+        assert test.failure_detected is True
+        assert test.recovery_detected is False
+        assert test.failure_count == 1
+        assert test.failure_duration_seconds is None
+
+        # Clean up test record
+        db.session.delete(test)
+        db.session.commit()
+
+
+def test_save_network_test_with_recovery():
+
+    app = create_database()
+
+    metrics = {
+        "packets_sent": 4,
+        "packets_received": 4,
+        "packet_loss": 0.0,
+        "latency_average": 30.0,
+        "latency_minimum": 28.0,
+        "latency_maximum": 34.0,
+        "jitter": 4.0,
+    }
+
+    analysis = {
+        "latency_status": "Good",
+        "jitter_status": "Good",
+        "packet_loss_status": "Good",
+        "overall_status": "Good",
+    }
+
+    failure_recovery = {
+        "state": "Available",
+        "failure_detected": False,
+        "recovery_detected": True,
+        "failure_count": 0,
+        "failure_duration_seconds": 15.0,
+    }
+
+    with app.app_context():
+
+        test = save_network_test(
+            "recovery-test.example",
+            metrics,
+            analysis,
+            failure_recovery=failure_recovery
+        )
+
+        assert test.id is not None
+        assert test.host == "recovery-test.example"
+
+        assert test.network_state == "Available"
+        assert test.failure_detected is False
+        assert test.recovery_detected is True
+        assert test.failure_count == 0
+        assert test.failure_duration_seconds == 15.0
+
+        # Clean up test record
+        db.session.delete(test)
+        db.session.commit()
+
+
+def test_save_network_test_with_failure_recovery_defaults():
+
+    app = create_database()
+
+    metrics = {
+        "packets_sent": 4,
+        "packets_received": 4,
+        "packet_loss": 0.0,
+        "latency_average": 25.0,
+        "latency_minimum": 20.0,
+        "latency_maximum": 30.0,
+        "jitter": 3.0,
+    }
+
+    analysis = {
+        "latency_status": "Good",
+        "jitter_status": "Good",
+        "packet_loss_status": "Good",
+        "overall_status": "Good",
+    }
+
+    with app.app_context():
+
+        test = save_network_test(
+            "default-test.example",
+            metrics,
+            analysis
+        )
+
+        assert test.id is not None
+
+        assert test.network_state is None
+        assert test.failure_detected is None
+        assert test.recovery_detected is None
+        assert test.failure_count is None
+        assert test.failure_duration_seconds is None
+
+        # Clean up test record
+        db.session.delete(test)
+        db.session.commit()

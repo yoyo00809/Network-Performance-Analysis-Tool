@@ -152,6 +152,39 @@ class NetworkTest(db.Model):
         nullable=True
     )
 
+    # --------------------------------------
+    # Failure & Recovery Detection
+    # --------------------------------------
+
+    network_state = db.Column(
+        db.String(20),
+        nullable=True
+    )
+
+    failure_detected = db.Column(
+        db.Boolean,
+        nullable=True
+    )
+
+    recovery_detected = db.Column(
+        db.Boolean,
+        nullable=True
+    )
+
+    failure_count = db.Column(
+        db.Integer,
+        nullable=True
+    )
+
+    failure_duration_seconds = db.Column(
+        db.Float,
+        nullable=True
+    )
+
+    # --------------------------------------
+    # Timestamp
+    # --------------------------------------
+
     created_at = db.Column(
         db.DateTime,
         default=datetime.utcnow,
@@ -193,7 +226,8 @@ def save_network_test(
     metrics,
     analysis,
     health_score=None,
-    anomaly=None
+    anomaly=None,
+    failure_recovery=None
 ):
     """
     Save a network performance test result
@@ -205,6 +239,7 @@ def save_network_test(
         analysis (dict): Performance analysis.
         health_score (dict): Network health score data.
         anomaly (dict): Anomaly detection result.
+        failure_recovery (dict): Failure and recovery result.
 
     Returns:
         NetworkTest: Saved database record.
@@ -215,6 +250,9 @@ def save_network_test(
 
     if anomaly is None:
         anomaly = {}
+
+    if failure_recovery is None:
+        failure_recovery = {}
 
     anomaly_types = anomaly.get(
         "anomaly_types",
@@ -319,6 +357,32 @@ def save_network_test(
 
         anomaly_details=json.dumps(
             anomaly_details
+        ),
+
+        # ----------------------------------
+        # Failure & Recovery Detection
+        # ----------------------------------
+
+        network_state=failure_recovery.get(
+            "state"
+        ),
+
+        failure_detected=failure_recovery.get(
+            "failure_detected"
+        ),
+
+        recovery_detected=failure_recovery.get(
+            "recovery_detected"
+        ),
+
+        failure_count=failure_recovery.get(
+            "failure_count"
+        ),
+
+        failure_duration_seconds=(
+            failure_recovery.get(
+                "failure_duration_seconds"
+            )
         )
     )
 
