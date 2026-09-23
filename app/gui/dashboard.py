@@ -3,9 +3,10 @@
 # GUI Dashboard
 # ==========================================
 
+import os
+import threading
 import tkinter as tk
 from tkinter import messagebox, ttk
-import threading
 
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -15,6 +16,15 @@ from app.monitoring.monitor import monitor_once
 from app.database.database import (
     create_database,
     get_test_history,
+)
+
+from app.reports.report_generator import (
+    generate_text_report,
+    save_text_report,
+)
+
+from app.reports.export import (
+    export_report_to_csv,
 )
 
 
@@ -280,6 +290,64 @@ class NPATDashboard:
         return card
 
     # ======================================
+    # Bottom Buttons
+    # ======================================
+
+    def create_bottom_buttons(self):
+
+        section = tk.Frame(
+            self.root,
+            padx=25,
+            pady=5
+        )
+
+        section.pack(
+            fill="x"
+        )
+
+        history_button = tk.Button(
+            section,
+            text="VIEW TEST HISTORY",
+            font=("Arial", 10, "bold"),
+            command=self.show_history,
+            padx=15,
+            pady=7
+        )
+
+        history_button.pack(
+            side="left",
+            padx=5
+        )
+
+        txt_button = tk.Button(
+            section,
+            text="OPEN TXT REPORT",
+            font=("Arial", 10, "bold"),
+            command=self.open_text_report,
+            padx=15,
+            pady=7
+        )
+
+        txt_button.pack(
+            side="left",
+            padx=5
+        )
+
+        csv_button = tk.Button(
+            section,
+            text="OPEN CSV REPORT",
+            font=("Arial", 10, "bold"),
+            command=self.open_csv_report,
+            padx=15,
+            pady=7
+        )
+
+        csv_button.pack(
+            side="left",
+            padx=5
+        )
+
+    # ======================================
     # Performance Chart
     # ======================================
 
@@ -485,35 +553,6 @@ class NPATDashboard:
         )
 
     # ======================================
-    # Bottom Buttons
-    # ======================================
-
-    def create_bottom_buttons(self):
-
-        section = tk.Frame(
-            self.root,
-            padx=25,
-            pady=5
-        )
-
-        section.pack(
-            fill="x"
-        )
-
-        history_button = tk.Button(
-            section,
-            text="VIEW TEST HISTORY",
-            font=("Arial", 10, "bold"),
-            command=self.show_history,
-            padx=15,
-            pady=7
-        )
-
-        history_button.pack(
-            side="left"
-        )
-
-    # ======================================
     # Start Test
     # ======================================
 
@@ -589,6 +628,51 @@ class NPATDashboard:
         recommendations = result["recommendations"]
 
         ping_result = result["ping"]
+
+        # ----------------------------------
+        # Generate Latest Reports
+        # ----------------------------------
+
+        reports_directory = os.path.join(
+            "data",
+            "reports"
+        )
+
+        os.makedirs(
+            reports_directory,
+            exist_ok=True
+        )
+
+        report = generate_text_report(
+            result["host"],
+            ping_result,
+            metrics,
+            analysis,
+            recommendations
+        )
+
+        text_report_path = os.path.join(
+            reports_directory,
+            "network_report.txt"
+        )
+
+        csv_report_path = os.path.join(
+            reports_directory,
+            "network_report.csv"
+        )
+
+        save_text_report(
+            report,
+            text_report_path
+        )
+
+        export_report_to_csv(
+            csv_report_path,
+            result["host"],
+            ping_result,
+            metrics,
+            analysis
+        )
 
         # ----------------------------------
         # Metrics
@@ -688,9 +772,6 @@ class NPATDashboard:
                 history = get_test_history(
                     limit=50
                 )
-
-                # Copy required values while
-                # database context is active.
 
                 history_data = []
 
@@ -923,6 +1004,76 @@ class NPATDashboard:
 
             empty_label.pack(
                 pady=5
+            )
+
+    # ======================================
+    # Open TXT Report
+    # ======================================
+
+    def open_text_report(self):
+
+        filepath = os.path.abspath(
+            os.path.join(
+                "data",
+                "reports",
+                "network_report.txt"
+            )
+        )
+
+        if not os.path.exists(filepath):
+
+            messagebox.showwarning(
+                "Report Not Found",
+                "TXT report has not been generated yet.\n\n"
+                "Run a network test first."
+            )
+
+            return
+
+        try:
+
+            os.startfile(filepath)
+
+        except Exception as error:
+
+            messagebox.showerror(
+                "Unable to Open Report",
+                f"Could not open TXT report:\n\n{error}"
+            )
+
+    # ======================================
+    # Open CSV Report
+    # ======================================
+
+    def open_csv_report(self):
+
+        filepath = os.path.abspath(
+            os.path.join(
+                "data",
+                "reports",
+                "network_report.csv"
+            )
+        )
+
+        if not os.path.exists(filepath):
+
+            messagebox.showwarning(
+                "Report Not Found",
+                "CSV report has not been generated yet.\n\n"
+                "Run a network test first."
+            )
+
+            return
+
+        try:
+
+            os.startfile(filepath)
+
+        except Exception as error:
+
+            messagebox.showerror(
+                "Unable to Open Report",
+                f"Could not open CSV report:\n\n{error}"
             )
 
     # ======================================
