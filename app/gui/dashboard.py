@@ -4,13 +4,18 @@
 # ==========================================
 
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, ttk
 import threading
 
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 from app.monitoring.monitor import monitor_once
+
+from app.database.database import (
+    create_database,
+    get_test_history,
+)
 
 
 # ==========================================
@@ -28,12 +33,12 @@ class NPATDashboard:
         )
 
         self.root.geometry(
-            "1000x850"
+            "1000x900"
         )
 
         self.root.minsize(
             900,
-            750
+            800
         )
 
         # ----------------------------------
@@ -69,6 +74,7 @@ class NPATDashboard:
         self.create_header()
         self.create_input_section()
         self.create_metrics_section()
+        self.create_bottom_buttons()
         self.create_chart_section()
         self.create_analysis_section()
         self.create_recommendations_section()
@@ -294,8 +300,6 @@ class NPATDashboard:
             pady=8
         )
 
-        # Create Matplotlib figure
-
         self.figure = Figure(
             figsize=(8, 3),
             dpi=100
@@ -456,7 +460,7 @@ class NPATDashboard:
             fill="both",
             expand=True,
             padx=25,
-            pady=(5, 15)
+            pady=(5, 10)
         )
 
         self.recommendations_text = tk.Text(
@@ -478,6 +482,35 @@ class NPATDashboard:
 
         self.recommendations_text.config(
             state="disabled"
+        )
+
+    # ======================================
+    # Bottom Buttons
+    # ======================================
+
+    def create_bottom_buttons(self):
+
+        section = tk.Frame(
+            self.root,
+            padx=25,
+            pady=5
+        )
+
+        section.pack(
+            fill="x"
+        )
+
+        history_button = tk.Button(
+            section,
+            text="VIEW TEST HISTORY",
+            font=("Arial", 10, "bold"),
+            command=self.show_history,
+            padx=15,
+            pady=7
+        )
+
+        history_button.pack(
+            side="left"
         )
 
     # ======================================
@@ -639,6 +672,258 @@ class NPATDashboard:
         self.status_var.set(
             f"Test completed for {result['host']}"
         )
+
+    # ======================================
+    # Test History Window
+    # ======================================
+
+    def show_history(self):
+
+        try:
+
+            app = create_database()
+
+            with app.app_context():
+
+                history = get_test_history(
+                    limit=50
+                )
+
+                # Copy required values while
+                # database context is active.
+
+                history_data = []
+
+                for record in history:
+
+                    history_data.append({
+                        "id": record.id,
+                        "host": record.host,
+                        "latency": record.latency_average,
+                        "jitter": record.jitter,
+                        "packet_loss": record.packet_loss,
+                        "status": record.overall_status,
+                        "created_at": record.created_at,
+                    })
+
+        except Exception as error:
+
+            messagebox.showerror(
+                "History Error",
+                f"Unable to load test history:\n\n{error}"
+            )
+
+            return
+
+        # ----------------------------------
+        # Create History Window
+        # ----------------------------------
+
+        history_window = tk.Toplevel(
+            self.root
+        )
+
+        history_window.title(
+            "NPAT - Test History"
+        )
+
+        history_window.geometry(
+            "950x500"
+        )
+
+        history_window.minsize(
+            800,
+            400
+        )
+
+        # ----------------------------------
+        # Heading
+        # ----------------------------------
+
+        heading = tk.Label(
+            history_window,
+            text="NETWORK TEST HISTORY",
+            font=("Arial", 18, "bold")
+        )
+
+        heading.pack(
+            pady=15
+        )
+
+        # ----------------------------------
+        # Table Frame
+        # ----------------------------------
+
+        table_frame = tk.Frame(
+            history_window
+        )
+
+        table_frame.pack(
+            fill="both",
+            expand=True,
+            padx=20,
+            pady=10
+        )
+
+        columns = (
+            "ID",
+            "Host",
+            "Latency",
+            "Jitter",
+            "Packet Loss",
+            "Status",
+            "Created At"
+        )
+
+        tree = ttk.Treeview(
+            table_frame,
+            columns=columns,
+            show="headings"
+        )
+
+        # ----------------------------------
+        # Column Headings
+        # ----------------------------------
+
+        tree.heading(
+            "ID",
+            text="ID"
+        )
+
+        tree.heading(
+            "Host",
+            text="Host"
+        )
+
+        tree.heading(
+            "Latency",
+            text="Latency (ms)"
+        )
+
+        tree.heading(
+            "Jitter",
+            text="Jitter (ms)"
+        )
+
+        tree.heading(
+            "Packet Loss",
+            text="Packet Loss (%)"
+        )
+
+        tree.heading(
+            "Status",
+            text="Overall Status"
+        )
+
+        tree.heading(
+            "Created At",
+            text="Created At"
+        )
+
+        # ----------------------------------
+        # Column Widths
+        # ----------------------------------
+
+        tree.column(
+            "ID",
+            width=50,
+            anchor="center"
+        )
+
+        tree.column(
+            "Host",
+            width=180
+        )
+
+        tree.column(
+            "Latency",
+            width=100,
+            anchor="center"
+        )
+
+        tree.column(
+            "Jitter",
+            width=100,
+            anchor="center"
+        )
+
+        tree.column(
+            "Packet Loss",
+            width=110,
+            anchor="center"
+        )
+
+        tree.column(
+            "Status",
+            width=110,
+            anchor="center"
+        )
+
+        tree.column(
+            "Created At",
+            width=180
+        )
+
+        # ----------------------------------
+        # Scrollbar
+        # ----------------------------------
+
+        scrollbar = ttk.Scrollbar(
+            table_frame,
+            orient="vertical",
+            command=tree.yview
+        )
+
+        tree.configure(
+            yscrollcommand=scrollbar.set
+        )
+
+        tree.pack(
+            side="left",
+            fill="both",
+            expand=True
+        )
+
+        scrollbar.pack(
+            side="right",
+            fill="y"
+        )
+
+        # ----------------------------------
+        # Insert History
+        # ----------------------------------
+
+        for record in history_data:
+
+            tree.insert(
+                "",
+                tk.END,
+                values=(
+                    record["id"],
+                    record["host"],
+                    record["latency"],
+                    record["jitter"],
+                    record["packet_loss"],
+                    record["status"],
+                    record["created_at"],
+                )
+            )
+
+        # ----------------------------------
+        # Empty History Message
+        # ----------------------------------
+
+        if not history_data:
+
+            empty_label = tk.Label(
+                history_window,
+                text="No network test history available.",
+                font=("Arial", 11)
+            )
+
+            empty_label.pack(
+                pady=5
+            )
 
     # ======================================
     # Error Handler
