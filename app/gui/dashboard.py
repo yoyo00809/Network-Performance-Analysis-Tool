@@ -43,11 +43,11 @@ class NPATDashboard:
         )
 
         self.root.geometry(
-            "1000x900"
+            "1200x900"
         )
 
         self.root.minsize(
-            900,
+            1100,
             800
         )
 
@@ -77,6 +77,26 @@ class NPATDashboard:
             value="--"
         )
 
+        self.health_score_var = tk.StringVar(
+            value="-- / 100"
+        )
+
+        self.health_status_var = tk.StringVar(
+            value="--"
+        )
+
+        self.anomaly_status_var = tk.StringVar(
+            value="--"
+        )
+
+        self.anomaly_count_var = tk.StringVar(
+            value="--"
+        )
+
+        self.anomaly_severity_var = tk.StringVar(
+            value="--"
+        )
+
         # ----------------------------------
         # Build Interface
         # ----------------------------------
@@ -87,6 +107,7 @@ class NPATDashboard:
         self.create_bottom_buttons()
         self.create_chart_section()
         self.create_analysis_section()
+        self.create_anomaly_section()
         self.create_recommendations_section()
 
     # ======================================
@@ -253,6 +274,21 @@ class NPATDashboard:
             fill="both",
             padx=5
         )
+
+        self.create_metric_card(
+            section,
+            "NETWORK HEALTH",
+            self.health_score_var
+        ).pack(
+            side="left",
+            expand=True,
+            fill="both",
+            padx=5
+        )
+
+    # ======================================
+    # Metric Card
+    # ======================================
 
     def create_metric_card(
         self,
@@ -499,7 +535,9 @@ class NPATDashboard:
             text=(
                 "Latency Status : --\n"
                 "Jitter Status  : --\n"
-                "Packet Loss    : --"
+                "Packet Loss    : --\n"
+                "Health Score   : -- / 100\n"
+                "Health Status  : --"
             ),
             font=("Arial", 11),
             justify="left",
@@ -509,6 +547,45 @@ class NPATDashboard:
         self.analysis_text.pack(
             fill="x"
         )
+
+    # ======================================
+    # Anomaly Detection Section
+    # ======================================
+
+    def create_anomaly_section(self):
+
+        section = tk.LabelFrame(
+            self.root,
+            text="Anomaly Detection",
+            font=("Arial", 11, "bold"),
+            padx=20,
+            pady=8
+        )
+
+        section.pack(
+            fill="x",
+            padx=25,
+            pady=5
+        )
+
+        self.anomaly_text = tk.Label(
+            section,
+            text=(
+                "Anomaly Status : --\n"
+                "Anomaly Count  : --\n"
+                "Severity       : --\n"
+                "Types          : --\n"
+                "Details        : --"
+            ),
+            font=("Arial", 10),
+            justify="left",
+            anchor="w"
+        )
+
+        self.anomaly_text.pack(
+            fill="x"
+        )
+
 
     # ======================================
     # Recommendations Section
@@ -625,6 +702,13 @@ class NPATDashboard:
 
         analysis = result["analysis"]
 
+        health_score = result["health_score"]
+
+        anomaly = result.get(
+            "anomaly",
+            {}
+        )
+
         recommendations = result["recommendations"]
 
         ping_result = result["ping"]
@@ -695,6 +779,30 @@ class NPATDashboard:
         )
 
         # ----------------------------------
+        # Network Health
+        # ----------------------------------
+
+        if health_score["health_score"] is not None:
+
+            self.health_score_var.set(
+                f"{health_score['health_score']} / 100"
+            )
+
+            self.health_status_var.set(
+                health_score["health_status"]
+            )
+
+        else:
+
+            self.health_score_var.set(
+                "-- / 100"
+            )
+
+            self.health_status_var.set(
+                "Unavailable"
+            )
+
+        # ----------------------------------
         # Update Graph
         # ----------------------------------
 
@@ -713,7 +821,98 @@ class NPATDashboard:
                 f"Jitter Status  : "
                 f"{analysis['jitter_status']}\n"
                 f"Packet Loss    : "
-                f"{analysis['packet_loss_status']}"
+                f"{analysis['packet_loss_status']}\n"
+                f"Health Score   : "
+                f"{health_score['health_score']} / 100\n"
+                f"Health Status  : "
+                f"{health_score['health_status']}"
+            )
+        )
+
+        # ----------------------------------
+        # Anomaly Detection
+        # ----------------------------------
+
+        anomaly_detected = anomaly.get(
+            "anomaly_detected",
+            False
+        )
+
+        anomaly_count = anomaly.get(
+            "anomaly_count",
+            0
+        )
+
+        anomaly_severity = anomaly.get(
+            "severity",
+            "Normal"
+        )
+
+        anomaly_types = anomaly.get(
+            "anomaly_types",
+            []
+        )
+
+        anomaly_details = anomaly.get(
+            "details",
+            []
+        )
+
+        if anomaly_types:
+
+            anomaly_types_display = ", ".join(
+                anomaly_types
+            )
+
+        else:
+
+            anomaly_types_display = "None"
+
+        if anomaly_details:
+
+            anomaly_details_display = "\n".join(
+                f"• {detail}"
+                for detail in anomaly_details
+            )
+
+        else:
+
+            anomaly_details_display = (
+                "No anomalies detected."
+            )
+
+        if anomaly_detected:
+
+            anomaly_status_display = "DETECTED"
+
+        else:
+
+            anomaly_status_display = "Normal"
+
+        self.anomaly_status_var.set(
+            anomaly_status_display
+        )
+
+        self.anomaly_count_var.set(
+            str(anomaly_count)
+        )
+
+        self.anomaly_severity_var.set(
+            anomaly_severity
+        )
+
+        self.anomaly_text.config(
+            text=(
+                f"Anomaly Status : "
+                f"{anomaly_status_display}\n"
+                f"Anomaly Count  : "
+                f"{anomaly_count}\n"
+                f"Severity       : "
+                f"{anomaly_severity}\n"
+                f"Types          : "
+                f"{anomaly_types_display}\n"
+                f"Details        :\n"
+                f"{anomaly_details_display}"
             )
         )
 
@@ -783,6 +982,11 @@ class NPATDashboard:
                         "latency": record.latency_average,
                         "jitter": record.jitter,
                         "packet_loss": record.packet_loss,
+                        "health_score": record.health_score,
+                        "health_status": record.health_status,
+                        "anomaly_detected": record.anomaly_detected,
+                        "anomaly_count": record.anomaly_count,
+                        "anomaly_severity": record.anomaly_severity,
                         "status": record.overall_status,
                         "created_at": record.created_at,
                     })
@@ -809,11 +1013,11 @@ class NPATDashboard:
         )
 
         history_window.geometry(
-            "950x500"
+            "1350x500"
         )
 
         history_window.minsize(
-            800,
+            900,
             400
         )
 
@@ -852,6 +1056,11 @@ class NPATDashboard:
             "Latency",
             "Jitter",
             "Packet Loss",
+            "Health Score",
+            "Health Status",
+            "Anomaly",
+            "Count",
+            "Severity",
             "Status",
             "Created At"
         )
@@ -892,6 +1101,31 @@ class NPATDashboard:
         )
 
         tree.heading(
+            "Health Score",
+            text="Health Score"
+        )
+
+        tree.heading(
+            "Health Status",
+            text="Health Status"
+        )
+
+        tree.heading(
+            "Anomaly",
+            text="Anomaly"
+        )
+
+        tree.heading(
+            "Count",
+            text="Count"
+        )
+
+        tree.heading(
+            "Severity",
+            text="Severity"
+        )
+
+        tree.heading(
             "Status",
             text="Overall Status"
         )
@@ -913,24 +1147,54 @@ class NPATDashboard:
 
         tree.column(
             "Host",
-            width=180
+            width=150
         )
 
         tree.column(
             "Latency",
-            width=100,
+            width=90,
             anchor="center"
         )
 
         tree.column(
             "Jitter",
-            width=100,
+            width=90,
             anchor="center"
         )
 
         tree.column(
             "Packet Loss",
             width=110,
+            anchor="center"
+        )
+
+        tree.column(
+            "Health Score",
+            width=110,
+            anchor="center"
+        )
+
+        tree.column(
+            "Health Status",
+            width=110,
+            anchor="center"
+        )
+
+        tree.column(
+            "Anomaly",
+            width=90,
+            anchor="center"
+        )
+
+        tree.column(
+            "Count",
+            width=70,
+            anchor="center"
+        )
+
+        tree.column(
+            "Severity",
+            width=100,
             anchor="center"
         )
 
@@ -942,7 +1206,7 @@ class NPATDashboard:
 
         tree.column(
             "Created At",
-            width=180
+            width=170
         )
 
         # ----------------------------------
@@ -976,6 +1240,15 @@ class NPATDashboard:
 
         for record in history_data:
 
+            health_score = record["health_score"]
+
+            if health_score is not None:
+                health_score_display = (
+                    f"{health_score} / 100"
+                )
+            else:
+                health_score_display = "--"
+
             tree.insert(
                 "",
                 tk.END,
@@ -985,6 +1258,19 @@ class NPATDashboard:
                     record["latency"],
                     record["jitter"],
                     record["packet_loss"],
+                    health_score_display,
+                    record["health_status"] or "--",
+                    (
+                        "Detected"
+                        if record["anomaly_detected"]
+                        else "Normal"
+                    ),
+                    (
+                        record["anomaly_count"]
+                        if record["anomaly_count"] is not None
+                        else 0
+                    ),
+                    record["anomaly_severity"] or "--",
                     record["status"],
                     record["created_at"],
                 )

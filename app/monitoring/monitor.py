@@ -1,37 +1,78 @@
 # ==========================================
 # Network Performance Analysis Tool (NPAT)
-# Network Monitoring Module
+# Monitoring Module
 # ==========================================
 
-from app.network.ping import ping_host
-from app.analysis.metrics import calculate_metrics
-from app.analysis.analyzer import analyze_performance
-from app.analysis.recommendations import generate_recommendations
 
-from app.database.database import (
-    create_database,
-    save_network_test,
+from app.network.ping import ping_host
+
+
+from app.analysis.metrics import (
+    calculate_metrics
 )
 
 
-def monitor_once(host, count=4):
+from app.analysis.analyzer import (
+    analyze_performance
+)
+
+
+from app.analysis.recommendations import (
+    generate_recommendations
+)
+
+
+from app.analysis.health_score import (
+    calculate_health_score
+)
+
+
+from app.analysis.anomaly_detector import (
+    detect_anomalies
+)
+
+
+from app.database.database import (
+    create_database,
+    save_network_test
+)
+
+
+def monitor_once(
+    host,
+    count=4
+):
     """
-    Perform one complete network monitoring cycle.
+    Perform one complete network monitoring test.
 
-    The cycle collects ping data, calculates metrics,
-    analyzes performance, generates recommendations,
-    and stores the result in the database.
+    Flow:
 
-    Args:
-        host (str): IP address or hostname.
-        count (int): Number of ping requests.
-
-    Returns:
-        dict: Complete monitoring result.
+    Host
+      ↓
+    Ping
+      ↓
+    Metrics
+      ↓
+    Performance Analysis
+      ↓
+    Health Score
+      ↓
+    Anomaly Detection
+      ↓
+    Recommendations
+      ↓
+    Database
     """
 
     # --------------------------------------
-    # Step 1: Collect raw ping data
+    # Create database
+    # --------------------------------------
+
+    app = create_database()
+
+
+    # --------------------------------------
+    # Ping target
     # --------------------------------------
 
     ping_result = ping_host(
@@ -39,8 +80,9 @@ def monitor_once(host, count=4):
         count=count
     )
 
+
     # --------------------------------------
-    # Step 2: Calculate metrics
+    # Calculate metrics
     # --------------------------------------
 
     metrics = calculate_metrics(
@@ -48,16 +90,40 @@ def monitor_once(host, count=4):
         ping_result["packets_sent"]
     )
 
+
     # --------------------------------------
-    # Step 3: Analyze performance
+    # Analyze performance
     # --------------------------------------
 
     analysis = analyze_performance(
         metrics
     )
 
+
     # --------------------------------------
-    # Step 4: Generate recommendations
+    # Calculate health score
+    # --------------------------------------
+
+    health_score = calculate_health_score(
+        metrics
+    )
+
+
+    # --------------------------------------
+    # Detect anomalies
+    # --------------------------------------
+
+    anomaly_result = detect_anomalies(
+        metrics,
+        ping_result.get(
+            "response_times",
+            []
+        )
+    )
+
+
+    # --------------------------------------
+    # Generate recommendations
     # --------------------------------------
 
     recommendations = generate_recommendations(
@@ -65,31 +131,42 @@ def monitor_once(host, count=4):
         analysis
     )
 
-    # --------------------------------------
-    # Step 5: Save result to database
-    # --------------------------------------
 
-    app = create_database()
+    # --------------------------------------
+    # Save result to database
+    # --------------------------------------
 
     with app.app_context():
 
         database_record = save_network_test(
             host,
             metrics,
-            analysis
+            analysis,
+            health_score,
+            anomaly_result
         )
 
         database_id = database_record.id
 
+
     # --------------------------------------
-    # Return complete monitoring result
+    # Return complete result
     # --------------------------------------
 
     return {
         "host": host,
+
         "ping": ping_result,
+
         "metrics": metrics,
+
         "analysis": analysis,
+
+        "health_score": health_score,
+
+        "anomaly": anomaly_result,
+
         "recommendations": recommendations,
+
         "database_id": database_id
     }

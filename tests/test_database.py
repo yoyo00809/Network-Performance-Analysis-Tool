@@ -3,6 +3,8 @@
 # Database Tests
 # ==========================================
 
+import json
+
 from app.database.database import (
     db,
     NetworkTest,
@@ -117,6 +119,148 @@ def test_get_test_history():
         ]
 
         assert len(matching_records) >= 1
+
+        # Clean up test record
+        db.session.delete(test)
+        db.session.commit()
+
+
+def test_save_network_test_with_health_score():
+
+    app = create_database()
+
+    metrics = {
+        "packets_sent": 4,
+        "packets_received": 4,
+        "packet_loss": 0.0,
+        "latency_average": 30.0,
+        "latency_minimum": 28.0,
+        "latency_maximum": 34.0,
+        "jitter": 5.0,
+    }
+
+    analysis = {
+        "latency_status": "Good",
+        "jitter_status": "Good",
+        "packet_loss_status": "Good",
+        "overall_status": "Good",
+    }
+
+    health_score = {
+        "health_score": 93.0,
+        "health_status": "Excellent",
+        "latency_score": 90,
+        "jitter_score": 100,
+        "packet_loss_score": 100,
+    }
+
+    with app.app_context():
+
+        test = save_network_test(
+            "health-test.example",
+            metrics,
+            analysis,
+            health_score
+        )
+
+        assert test.id is not None
+        assert test.host == "health-test.example"
+
+        assert test.health_score == 93.0
+        assert test.health_status == "Excellent"
+        assert test.latency_score == 90
+        assert test.jitter_score == 100
+        assert test.packet_loss_score == 100
+
+        # Clean up test record
+        db.session.delete(test)
+        db.session.commit()
+
+
+# ------------------------------------------
+# Anomaly Detection Database Test
+# ------------------------------------------
+
+def test_save_network_test_with_anomaly():
+
+    app = create_database()
+
+    metrics = {
+        "packets_sent": 4,
+        "packets_received": 4,
+        "packet_loss": 0.0,
+        "latency_average": 80.0,
+        "latency_minimum": 20.0,
+        "latency_maximum": 180.0,
+        "jitter": 65.0,
+    }
+
+    analysis = {
+        "latency_status": "Average",
+        "jitter_status": "Poor",
+        "packet_loss_status": "Good",
+        "overall_status": "Poor",
+    }
+
+    anomaly = {
+        "anomaly_detected": True,
+        "anomaly_count": 2,
+        "anomaly_types": [
+            "Latency Spike",
+            "High Jitter",
+        ],
+        "severity": "Critical",
+        "details": [
+            "Unusual latency spike detected: [180.0]",
+            "High jitter detected: 65.0 ms",
+        ],
+    }
+
+    with app.app_context():
+
+        test = save_network_test(
+            "anomaly-test.example",
+            metrics,
+            analysis,
+            anomaly=anomaly
+        )
+
+        assert test.id is not None
+        assert test.host == "anomaly-test.example"
+
+        # ----------------------------------
+        # Basic anomaly fields
+        # ----------------------------------
+
+        assert test.anomaly_detected is True
+        assert test.anomaly_count == 2
+        assert test.anomaly_severity == "Critical"
+
+        # ----------------------------------
+        # JSON anomaly types
+        # ----------------------------------
+
+        saved_types = json.loads(
+            test.anomaly_types
+        )
+
+        assert saved_types == [
+            "Latency Spike",
+            "High Jitter",
+        ]
+
+        # ----------------------------------
+        # JSON anomaly details
+        # ----------------------------------
+
+        saved_details = json.loads(
+            test.anomaly_details
+        )
+
+        assert saved_details == [
+            "Unusual latency spike detected: [180.0]",
+            "High jitter detected: 65.0 ms",
+        ]
 
         # Clean up test record
         db.session.delete(test)
