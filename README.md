@@ -829,3 +829,9 @@ The core NPAT system is functional and currently verified with:
 86 passed
 
 The project is continuing through the enhancement, documentation, and final academic-submission stages.
+
+
+
+From your main project folder:
+to run main app
+python -m app.gui.dashboard
