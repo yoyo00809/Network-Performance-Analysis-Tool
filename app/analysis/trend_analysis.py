@@ -81,6 +81,34 @@ def analyze_historical_tests(records):
         if record.health_score is not None
     ]
 
+    download_speed_values = [
+        getattr(
+            record,
+            "download_speed_mbps",
+            None
+        )
+        for record in records
+        if getattr(
+            record,
+            "download_speed_mbps",
+            None
+        ) is not None
+    ]
+
+    upload_speed_values = [
+        getattr(
+            record,
+            "upload_speed_mbps",
+            None
+        )
+        for record in records
+        if getattr(
+            record,
+            "upload_speed_mbps",
+            None
+        ) is not None
+    ]
+
     available_count = sum(
         1
         for record in records
@@ -124,6 +152,14 @@ def analyze_historical_tests(records):
             health_score_values
         ),
 
+        "download_speed": calculate_trend(
+            download_speed_values
+        ),
+
+        "upload_speed": calculate_trend(
+            upload_speed_values
+        ),
+
         "availability": {
             "available": available_count,
             "unavailable": unavailable_count,
@@ -161,6 +197,24 @@ def get_metric_series(records):
 
         "health_score": [
             record.health_score
+            for record in records
+        ],
+
+        "download_speed": [
+            getattr(
+                record,
+                "download_speed_mbps",
+                None
+            )
+            for record in records
+        ],
+
+        "upload_speed": [
+            getattr(
+                record,
+                "upload_speed_mbps",
+                None
+            )
             for record in records
         ],
     }

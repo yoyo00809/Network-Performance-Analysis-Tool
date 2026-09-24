@@ -57,6 +57,8 @@ def test_analyze_historical_tests():
             jitter=5.0,
             packet_loss=0.0,
             health_score=95.0,
+            download_speed_mbps=100.0,
+            upload_speed_mbps=50.0,
             network_state="Available",
             failure_detected=False,
             recovery_detected=False,
@@ -66,6 +68,8 @@ def test_analyze_historical_tests():
             jitter=10.0,
             packet_loss=2.0,
             health_score=80.0,
+            download_speed_mbps=80.0,
+            upload_speed_mbps=40.0,
             network_state="Unavailable",
             failure_detected=True,
             recovery_detected=False,
@@ -75,6 +79,8 @@ def test_analyze_historical_tests():
             jitter=15.0,
             packet_loss=1.0,
             health_score=90.0,
+            download_speed_mbps=120.0,
+            upload_speed_mbps=60.0,
             network_state="Available",
             failure_detected=False,
             recovery_detected=True,
@@ -124,6 +130,24 @@ def test_analyze_historical_tests():
     assert result["health_score"]["count"] == 3
 
     # --------------------------------------
+    # Download Speed
+    # --------------------------------------
+
+    assert result["download_speed"]["average"] == 100.0
+    assert result["download_speed"]["minimum"] == 80.0
+    assert result["download_speed"]["maximum"] == 120.0
+    assert result["download_speed"]["count"] == 3
+
+    # --------------------------------------
+    # Upload Speed
+    # --------------------------------------
+
+    assert result["upload_speed"]["average"] == 50.0
+    assert result["upload_speed"]["minimum"] == 40.0
+    assert result["upload_speed"]["maximum"] == 60.0
+    assert result["upload_speed"]["count"] == 3
+
+    # --------------------------------------
     # Availability
     # --------------------------------------
 
@@ -148,6 +172,8 @@ def test_analyze_empty_history():
     assert result["jitter"]["count"] == 0
     assert result["packet_loss"]["count"] == 0
     assert result["health_score"]["count"] == 0
+    assert result["download_speed"]["count"] == 0
+    assert result["upload_speed"]["count"] == 0
 
     assert result["availability"]["available"] == 0
     assert result["availability"]["unavailable"] == 0
@@ -164,18 +190,24 @@ def test_get_metric_series():
             jitter=5.0,
             packet_loss=0.0,
             health_score=95.0,
+            download_speed_mbps=100.0,
+            upload_speed_mbps=50.0,
         ),
         SimpleNamespace(
             latency_average=40.0,
             jitter=10.0,
             packet_loss=2.0,
             health_score=80.0,
+            download_speed_mbps=80.0,
+            upload_speed_mbps=40.0,
         ),
         SimpleNamespace(
             latency_average=None,
             jitter=None,
             packet_loss=None,
             health_score=None,
+            download_speed_mbps=None,
+            upload_speed_mbps=None,
         ),
     ]
 
@@ -204,5 +236,17 @@ def test_get_metric_series():
     assert result["health_score"] == [
         95.0,
         80.0,
+        None,
+    ]
+
+    assert result["download_speed"] == [
+        100.0,
+        80.0,
+        None,
+    ]
+
+    assert result["upload_speed"] == [
+        50.0,
+        40.0,
         None,
     ]

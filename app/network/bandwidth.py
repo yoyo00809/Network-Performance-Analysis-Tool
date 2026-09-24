@@ -8,7 +8,27 @@ import time
 import requests
 
 
-def measure_download_speed(url, timeout=30):
+# ==========================================
+# Default Bandwidth Test Endpoints
+# ==========================================
+
+DEFAULT_DOWNLOAD_URL = (
+    "https://speed.cloudflare.com/__down?bytes=5000000"
+)
+
+DEFAULT_UPLOAD_URL = (
+    "https://speed.cloudflare.com/__up"
+)
+
+
+# ==========================================
+# Download Speed
+# ==========================================
+
+def measure_download_speed(
+    url=DEFAULT_DOWNLOAD_URL,
+    timeout=30
+):
     """
     Measure approximate download speed from an HTTP resource.
 
@@ -21,6 +41,7 @@ def measure_download_speed(url, timeout=30):
     """
 
     try:
+
         start_time = time.perf_counter()
 
         response = requests.get(
@@ -36,18 +57,23 @@ def measure_download_speed(url, timeout=30):
         for chunk in response.iter_content(
             chunk_size=64 * 1024
         ):
+
             if chunk:
                 total_bytes += len(chunk)
 
         end_time = time.perf_counter()
 
-        elapsed_time = end_time - start_time
+        elapsed_time = (
+            end_time - start_time
+        )
 
         if elapsed_time <= 0:
+
             return {
                 "status": "Failed",
                 "speed_mbps": None,
-                "bytes_received": total_bytes
+                "bytes_received": total_bytes,
+                "duration_seconds": elapsed_time
             }
 
         speed_mbps = (
@@ -58,26 +84,38 @@ def measure_download_speed(url, timeout=30):
 
         return {
             "status": "Success",
-            "speed_mbps": round(speed_mbps, 2),
+            "speed_mbps": round(
+                speed_mbps,
+                2
+            ),
             "bytes_received": total_bytes,
-            "duration_seconds": round(elapsed_time, 2)
+            "duration_seconds": round(
+                elapsed_time,
+                2
+            )
         }
 
     except requests.RequestException as error:
+
         return {
             "status": f"Error: {error}",
             "speed_mbps": None,
-            "bytes_received": 0
+            "bytes_received": 0,
+            "duration_seconds": None
         }
 
 
+# ==========================================
+# Upload Speed
+# ==========================================
+
 def measure_upload_speed(
-    url,
+    url=DEFAULT_UPLOAD_URL,
     data_size_mb=1,
     timeout=30
 ):
     """
-    Measure approximate upload speed using an HTTP POST request.
+    Measure approximate upload speed using HTTP POST.
 
     Args:
         url (str): Server endpoint accepting POST data.
@@ -88,8 +126,11 @@ def measure_upload_speed(
         dict: Upload speed measurement results.
     """
 
+    data_size_bytes = (
+        data_size_mb * 1024 * 1024
+    )
+
     try:
-        data_size_bytes = data_size_mb * 1024 * 1024
 
         test_data = b"0" * data_size_bytes
 
@@ -105,13 +146,17 @@ def measure_upload_speed(
 
         end_time = time.perf_counter()
 
-        elapsed_time = end_time - start_time
+        elapsed_time = (
+            end_time - start_time
+        )
 
         if elapsed_time <= 0:
+
             return {
                 "status": "Failed",
                 "speed_mbps": None,
-                "bytes_sent": data_size_bytes
+                "bytes_sent": data_size_bytes,
+                "duration_seconds": elapsed_time
             }
 
         speed_mbps = (
@@ -122,18 +167,30 @@ def measure_upload_speed(
 
         return {
             "status": "Success",
-            "speed_mbps": round(speed_mbps, 2),
+            "speed_mbps": round(
+                speed_mbps,
+                2
+            ),
             "bytes_sent": data_size_bytes,
-            "duration_seconds": round(elapsed_time, 2)
+            "duration_seconds": round(
+                elapsed_time,
+                2
+            )
         }
 
     except requests.RequestException as error:
+
         return {
             "status": f"Error: {error}",
             "speed_mbps": None,
-            "bytes_sent": data_size_bytes
+            "bytes_sent": data_size_bytes,
+            "duration_seconds": None
         }
 
+
+# ==========================================
+# Bandwidth Calculation
+# ==========================================
 
 def calculate_bandwidth_mbps(
     total_bytes,
@@ -151,6 +208,7 @@ def calculate_bandwidth_mbps(
     """
 
     if duration_seconds <= 0:
+
         return None
 
     speed_mbps = (
@@ -159,4 +217,7 @@ def calculate_bandwidth_mbps(
         duration_seconds * 1_000_000
     )
 
-    return round(speed_mbps, 2)
+    return round(
+        speed_mbps,
+        2
+    )

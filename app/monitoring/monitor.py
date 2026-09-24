@@ -7,6 +7,12 @@
 from app.network.ping import ping_host
 
 
+from app.network.bandwidth import (
+    measure_download_speed,
+    measure_upload_speed
+)
+
+
 from app.analysis.metrics import (
     calculate_metrics
 )
@@ -88,9 +94,96 @@ def reset_failure_recovery_tracker(host=None):
         _trackers[host].reset()
 
 
+# ==========================================
+# Bandwidth Measurement
+# ==========================================
+
+def measure_bandwidth():
+    """
+    Measure download and upload bandwidth.
+
+    The bandwidth functions return detailed dictionaries
+    containing speed information.
+
+    This function extracts only the numeric Mbps value
+    required by the database and dashboard.
+
+    It also remains compatible with tests where the
+    bandwidth functions may return a numeric value directly.
+
+    Returns:
+        Dictionary containing download and upload
+        speeds in Mbps.
+    """
+
+    bandwidth = {
+        "download_speed_mbps": None,
+        "upload_speed_mbps": None
+    }
+
+    # --------------------------------------
+    # Download speed
+    # --------------------------------------
+
+    try:
+
+        download_result = measure_download_speed()
+
+        if isinstance(download_result, dict):
+
+            bandwidth["download_speed_mbps"] = (
+                download_result.get("speed_mbps")
+            )
+
+        else:
+
+            # Compatibility with mocked tests
+            bandwidth["download_speed_mbps"] = (
+                download_result
+            )
+
+    except Exception:
+
+        bandwidth["download_speed_mbps"] = None
+
+
+    # --------------------------------------
+    # Upload speed
+    # --------------------------------------
+
+    try:
+
+        upload_result = measure_upload_speed()
+
+        if isinstance(upload_result, dict):
+
+            bandwidth["upload_speed_mbps"] = (
+                upload_result.get("speed_mbps")
+            )
+
+        else:
+
+            # Compatibility with mocked tests
+            bandwidth["upload_speed_mbps"] = (
+                upload_result
+            )
+
+    except Exception:
+
+        bandwidth["upload_speed_mbps"] = None
+
+
+    return bandwidth
+
+
+# ==========================================
+# Main Monitoring Function
+# ==========================================
+
 def monitor_once(
     host,
-    count=4
+    count=4,
+    include_bandwidth=False
 ):
     """
     Perform one complete network monitoring test.
@@ -110,6 +203,8 @@ def monitor_once(
     Anomaly Detection
       ↓
     Failure & Recovery Detection
+      ↓
+    Bandwidth Measurement (optional)
       ↓
     Recommendations
       ↓
@@ -189,6 +284,20 @@ def monitor_once(
 
 
     # --------------------------------------
+    # Bandwidth Measurement
+    # --------------------------------------
+
+    bandwidth = {
+        "download_speed_mbps": None,
+        "upload_speed_mbps": None
+    }
+
+    if include_bandwidth:
+
+        bandwidth = measure_bandwidth()
+
+
+    # --------------------------------------
     # Generate recommendations
     # --------------------------------------
 
@@ -210,7 +319,8 @@ def monitor_once(
             analysis,
             health_score,
             anomaly_result,
-            failure_recovery
+            failure_recovery,
+            bandwidth
         )
 
         database_id = database_record.id
@@ -234,6 +344,8 @@ def monitor_once(
         "anomaly": anomaly_result,
 
         "failure_recovery": failure_recovery,
+
+        "bandwidth": bandwidth,
 
         "recommendations": recommendations,
 

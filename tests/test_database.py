@@ -415,3 +415,110 @@ def test_save_network_test_with_failure_recovery_defaults():
         # Clean up test record
         db.session.delete(test)
         db.session.commit()
+    
+    
+# ==========================================
+# Bandwidth Database Tests
+# ==========================================
+
+def test_save_network_test_with_bandwidth():
+
+    app = create_database()
+
+    metrics = {
+        "packets_sent": 4,
+        "packets_received": 4,
+        "packet_loss": 0.0,
+        "latency_average": 25.0,
+        "latency_minimum": 20.0,
+        "latency_maximum": 30.0,
+        "jitter": 3.0,
+    }
+
+    analysis = {
+        "latency_status": "Good",
+        "jitter_status": "Good",
+        "packet_loss_status": "Good",
+        "overall_status": "Good",
+    }
+
+    bandwidth = {
+        "download_speed_mbps": 120.75,
+        "upload_speed_mbps": 60.50,
+    }
+
+    with app.app_context():
+
+        test = save_network_test(
+            "bandwidth-test.example",
+            metrics,
+            analysis,
+            bandwidth=bandwidth
+        )
+
+        assert test.id is not None
+        assert test.host == "bandwidth-test.example"
+
+        assert test.download_speed_mbps == 120.75
+        assert test.upload_speed_mbps == 60.50
+
+        # Clean up test record
+        db.session.delete(test)
+        db.session.commit()
+
+
+def test_get_test_history_with_bandwidth():
+
+    app = create_database()
+
+    metrics = {
+        "packets_sent": 4,
+        "packets_received": 4,
+        "packet_loss": 0.0,
+        "latency_average": 30.0,
+        "latency_minimum": 25.0,
+        "latency_maximum": 35.0,
+        "jitter": 4.0,
+    }
+
+    analysis = {
+        "latency_status": "Good",
+        "jitter_status": "Good",
+        "packet_loss_status": "Good",
+        "overall_status": "Good",
+    }
+
+    bandwidth = {
+        "download_speed_mbps": 100.25,
+        "upload_speed_mbps": 50.75,
+    }
+
+    with app.app_context():
+
+        test = save_network_test(
+            "bandwidth-history.example",
+            metrics,
+            analysis,
+            bandwidth=bandwidth
+        )
+
+        history = get_test_history(
+            limit=10
+        )
+
+        matching_records = [
+            record
+            for record in history
+            if record.host == "bandwidth-history.example"
+        ]
+
+        assert len(matching_records) >= 1
+
+        record = matching_records[0]
+
+        assert record.download_speed_mbps == 100.25
+        assert record.upload_speed_mbps == 50.75
+
+        # Clean up test record
+        db.session.delete(test)
+        db.session.commit()

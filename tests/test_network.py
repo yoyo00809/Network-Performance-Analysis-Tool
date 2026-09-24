@@ -4,6 +4,7 @@
 # ==========================================
 
 import ipaddress
+import app.network.scanner as scanner_module
 
 from app.network.scanner import (
     get_local_network,
@@ -63,6 +64,53 @@ def test_scan_network_with_custom_network():
     )
 
     assert "127.0.0.1" in result
+
+
+def test_scan_network_with_mocked_devices(
+    monkeypatch
+):
+
+    network = ipaddress.ip_network(
+        "192.168.1.0/29"
+    )
+
+    def fake_ping_device(ip_address):
+
+        return str(ip_address) in [
+            "192.168.1.1",
+            "192.168.1.5",
+        ]
+
+    monkeypatch.setattr(
+        scanner_module,
+        "ping_device",
+        fake_ping_device
+    )
+
+    result = scanner_module.scan_network(
+        network,
+        max_workers=4
+    )
+
+    assert result == [
+        "192.168.1.1",
+        "192.168.1.5",
+    ]
+
+
+def test_scan_network_without_network(
+    monkeypatch
+):
+
+    monkeypatch.setattr(
+        scanner_module,
+        "get_local_network",
+        lambda: None
+    )
+
+    result = scanner_module.scan_network()
+
+    assert result == []
 
 
 # ==========================================
@@ -202,6 +250,7 @@ def test_calculate_bandwidth_invalid_duration():
         -1
     ) is None
 
+
 # ==========================================
 # Report Generator Tests
 # ==========================================
@@ -250,12 +299,18 @@ def test_generate_text_report():
         "No immediate action is required."
     ]
 
+    bandwidth = {
+        "download_speed_mbps": 100.0,
+        "upload_speed_mbps": 50.0,
+    }
+
     report = generate_text_report(
         host,
         ping_result,
         metrics,
         analysis,
-        recommendations
+        recommendations,
+        bandwidth
     )
 
     assert isinstance(
@@ -270,6 +325,12 @@ def test_generate_text_report():
     assert "Overall Status" in report
     assert "Good" in report
     assert "RECOMMENDATIONS" in report
+
+    # Bandwidth assertions
+    assert "Download Speed" in report
+    assert "100.00 Mbps" in report
+    assert "Upload Speed" in report
+    assert "50.00 Mbps" in report
 
 
 def test_save_text_report(tmp_path):
@@ -292,7 +353,8 @@ def test_save_text_report(tmp_path):
     )
 
     assert saved_content == report
-    
+
+
 # ==========================================
 # Report Export Tests
 # ==========================================
@@ -329,12 +391,18 @@ def test_export_report_to_csv(tmp_path):
         "overall_status": "Good",
     }
 
+    bandwidth = {
+        "download_speed_mbps": 100.0,
+        "upload_speed_mbps": 50.0,
+    }
+
     result = export_report_to_csv(
         str(filepath),
         host,
         ping_result,
         metrics,
-        analysis
+        analysis,
+        bandwidth
     )
 
     assert result == str(filepath)
@@ -349,6 +417,12 @@ def test_export_report_to_csv(tmp_path):
     assert "Average Latency (ms)" in content
     assert "Overall Status" in content
     assert "Good" in content
+
+    # Bandwidth assertions
+    assert "Download Speed (Mbps)" in content
+    assert "Upload Speed (Mbps)" in content
+    assert "100.0" in content
+    assert "50.0" in content
 
 
 def test_export_history_to_csv(tmp_path):
@@ -372,6 +446,10 @@ def test_export_history_to_csv(tmp_path):
         overall_status = "Good"
         created_at = "2026-09-23 12:00:00"
 
+        # Bandwidth fields
+        download_speed_mbps = 100.0
+        upload_speed_mbps = 50.0
+
     history = [
         TestRecord()
     ]
@@ -392,3 +470,9 @@ def test_export_history_to_csv(tmp_path):
     assert "Host" in content
     assert "127.0.0.1" in content
     assert "Overall Status" in content
+
+    # Bandwidth assertions
+    assert "Download Speed (Mbps)" in content
+    assert "Upload Speed (Mbps)" in content
+    assert "100.0" in content
+    assert "50.0" in content

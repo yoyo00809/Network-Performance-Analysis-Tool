@@ -13,6 +13,11 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 from app.monitoring.monitor import monitor_once
 
+from app.network.scanner import (
+    get_local_network,
+    scan_network,
+)
+
 from app.database.database import (
     create_database,
     get_test_history,
@@ -48,13 +53,89 @@ class NPATDashboard:
         )
 
         self.root.geometry(
-            "1200x1000"
+            "1200x850"
         )
 
         self.root.minsize(
             1100,
-            900
+            700
         )
+        
+        # ----------------------------------
+        # Scrollable Main Dashboard
+        # ----------------------------------
+
+        self.main_canvas = tk.Canvas(
+            self.root,
+            highlightthickness=0
+        )
+
+        self.main_scrollbar = ttk.Scrollbar(
+            self.root,
+            orient="vertical",
+            command=self.main_canvas.yview
+        )
+
+        self.main_canvas.configure(
+            yscrollcommand=self.main_scrollbar.set
+        )
+
+        self.main_scrollbar.pack(
+            side="right",
+            fill="y"
+        )
+
+        self.main_canvas.pack(
+            side="left",
+            fill="both",
+            expand=True
+        )
+
+        self.main_content = tk.Frame(
+            self.main_canvas
+        )
+
+        self.main_canvas_window = self.main_canvas.create_window(
+            (0, 0),
+            window=self.main_content,
+            anchor="nw"
+)       
+
+        def update_main_scroll_region(event=None):
+
+            self.main_canvas.configure(
+                scrollregion=self.main_canvas.bbox("all")
+            )
+
+        self.main_content.bind(
+            "<Configure>",
+            update_main_scroll_region
+        )
+
+        def resize_main_content(event):
+
+            self.main_canvas.itemconfigure(
+                self.main_canvas_window,
+                width=event.width
+            )
+
+        self.main_canvas.bind(
+            "<Configure>",
+            resize_main_content
+        )
+
+        def main_mousewheel(event):
+
+            self.main_canvas.yview_scroll(
+                int(-1 * (event.delta / 120)),
+                "units"
+            )
+
+        self.main_canvas.bind_all(
+            "<MouseWheel>",
+            main_mousewheel
+        )
+        
 
         # ----------------------------------
         # Variables
@@ -65,26 +146,48 @@ class NPATDashboard:
         self.status_var = tk.StringVar(
             value="Ready"
         )
+        
+        # ----------------------------------
+        # Network Scanner Variables
+        # ----------------------------------
+
+        self.scanner_network_var = tk.StringVar(
+            value="Detecting..."
+        )
+
+        self.scanner_status_var = tk.StringVar(
+            value="Ready"
+        )
+
+        self.scanner_count_var = tk.StringVar(
+            value="0 devices found"
+        )
 
         self.latency_var = tk.StringVar(
             value="-- ms"
-        )
-
+            )
         self.jitter_var = tk.StringVar(
             value="-- ms"
-        )
-
+            )
         self.packet_loss_var = tk.StringVar(
             value="-- %"
-        )
-
+            )
+        
+        self.download_speed_var = tk.StringVar(
+            value="-- Mbps"
+            )
+        
+        self.upload_speed_var = tk.StringVar(
+            value="-- Mbps"
+            )
+        
         self.overall_var = tk.StringVar(
             value="--"
-        )
-
+            )
+        
         self.health_score_var = tk.StringVar(
             value="-- / 100"
-        )
+            )
 
         self.health_status_var = tk.StringVar(
             value="--"
@@ -108,6 +211,7 @@ class NPATDashboard:
 
         self.create_header()
         self.create_input_section()
+        self.create_network_scanner_section()
         self.create_metrics_section()
         self.create_bottom_buttons()
         self.create_chart_section()
@@ -122,7 +226,7 @@ class NPATDashboard:
     def create_header(self):
 
         header = tk.Frame(
-            self.root,
+            self.main_content,
             bg="#1f2937",
             height=90
         )
@@ -160,7 +264,7 @@ class NPATDashboard:
     def create_input_section(self):
 
         section = tk.Frame(
-            self.root,
+            self.main_content,
             padx=25,
             pady=15
         )
@@ -220,6 +324,359 @@ class NPATDashboard:
             padx=15
         )
 
+    
+    # ======================================
+    # Network Scanner
+    # ======================================
+
+    def create_network_scanner_section(self):
+
+        section = tk.LabelFrame(
+            self.main_content,
+            text="Network Scanner",
+            font=("Arial", 11, "bold"),
+            padx=15,
+            pady=10
+        )
+
+        section.pack(
+            fill="x",
+            padx=25,
+            pady=8
+        )
+
+        # ----------------------------------
+        # Network Information
+        # ----------------------------------
+
+        info_frame = tk.Frame(
+            section
+        )
+
+        info_frame.pack(
+            fill="x",
+            pady=(0, 8)
+        )
+
+        network_label = tk.Label(
+            info_frame,
+            text="Local Network:",
+            font=("Arial", 10, "bold")
+        )
+
+        network_label.pack(
+            side="left"
+        )
+
+        network_value = tk.Label(
+            info_frame,
+            textvariable=self.scanner_network_var,
+            font=("Arial", 10)
+        )
+
+        network_value.pack(
+            side="left",
+            padx=8
+        )
+
+        status_label = tk.Label(
+            info_frame,
+            textvariable=self.scanner_status_var,
+            font=("Arial", 10)
+        )
+
+        status_label.pack(
+            side="left",
+            padx=20
+        )
+
+        count_label = tk.Label(
+            info_frame,
+            textvariable=self.scanner_count_var,
+            font=("Arial", 10, "bold")
+        )
+
+        count_label.pack(
+            side="right"
+        )
+
+        # ----------------------------------
+        # Scanner Buttons
+        # ----------------------------------
+
+        button_frame = tk.Frame(
+            section
+        )
+
+        button_frame.pack(
+            fill="x",
+            pady=(0, 8)
+        )
+
+        self.scan_button = tk.Button(
+            button_frame,
+            text="SCAN NETWORK",
+            font=("Arial", 10, "bold"),
+            command=self.start_network_scan,
+            padx=15,
+            pady=7
+        )
+
+        self.scan_button.pack(
+            side="left"
+        )
+
+        clear_button = tk.Button(
+            button_frame,
+            text="CLEAR RESULTS",
+            font=("Arial", 10, "bold"),
+            command=self.clear_network_scan,
+            padx=15,
+            pady=7
+        )
+
+        clear_button.pack(
+            side="left",
+            padx=8
+        )
+
+        # ----------------------------------
+        # Device Table
+        # ----------------------------------
+
+        table_frame = tk.Frame(
+            section
+        )
+
+        table_frame.pack(
+            fill="x"
+        )
+
+        columns = (
+            "ip_address",
+            "status"
+        )
+
+        self.scanner_tree = ttk.Treeview(
+            table_frame,
+            columns=columns,
+            show="headings",
+            height=5
+        )
+
+        self.scanner_tree.heading(
+            "ip_address",
+            text="IP Address"
+        )
+
+        self.scanner_tree.heading(
+            "status",
+            text="Status"
+        )
+
+        self.scanner_tree.column(
+            "ip_address",
+            width=250,
+            anchor="center"
+        )
+
+        self.scanner_tree.column(
+            "status",
+            width=180,
+            anchor="center"
+        )
+
+        scanner_scrollbar = ttk.Scrollbar(
+            table_frame,
+            orient="vertical",
+            command=self.scanner_tree.yview
+        )
+
+        self.scanner_tree.configure(
+            yscrollcommand=scanner_scrollbar.set
+        )
+
+        self.scanner_tree.pack(
+            side="left",
+            fill="x",
+            expand=True
+        )
+
+        scanner_scrollbar.pack(
+            side="right",
+            fill="y"
+        )
+
+        # ----------------------------------
+        # Detect Local Network
+        # ----------------------------------
+
+        try:
+
+            network = get_local_network()
+
+            if network is not None:
+                self.scanner_network_var.set(
+                    str(network)
+                )
+            else:
+                self.scanner_network_var.set(
+                    "Unable to detect"
+                )
+
+        except Exception:
+            self.scanner_network_var.set(
+                "Unable to detect"
+            )
+
+    # ======================================
+    # Start Network Scan
+    # ======================================
+
+    def start_network_scan(self):
+
+        if getattr(
+            self,
+            "_network_scan_running",
+            False
+        ):
+            return
+
+        self._network_scan_running = True
+
+        self.scan_button.config(
+            state="disabled"
+        )
+
+        self.scanner_status_var.set(
+            "Scanning network..."
+        )
+
+        self.scanner_count_var.set(
+            "Scanning..."
+        )
+
+        self.clear_network_scan(
+            keep_status=True
+        )
+
+        scan_thread = threading.Thread(
+            target=self._run_network_scan,
+            daemon=True
+        )
+
+        scan_thread.start()
+
+    # ======================================
+    # Background Network Scan
+    # ======================================
+
+    def _run_network_scan(self):
+
+        try:
+
+            network = get_local_network()
+
+            if network is None:
+
+                self.root.after(
+                    0,
+                    lambda: self._network_scan_finished(
+                        [],
+                        "Unable to detect local network"
+                    )
+                )
+
+                return
+
+            active_devices = scan_network(
+                network
+            )
+
+            self.root.after(
+                0,
+                lambda: self._network_scan_finished(
+                    active_devices,
+                    "Scan completed"
+                )
+            )
+
+        except Exception as error:
+
+            self.root.after(
+                0,
+                lambda: self._network_scan_finished(
+                    [],
+                    f"Scan failed: {error}"
+                )
+            )
+
+    # ======================================
+    # Network Scan Completion
+    # ======================================
+
+    def _network_scan_finished(
+        self,
+        active_devices,
+        status_message
+    ):
+
+        self._network_scan_running = False
+
+        self.scan_button.config(
+            state="normal"
+        )
+
+        self.scanner_status_var.set(
+            status_message
+        )
+
+        self.scanner_count_var.set(
+            f"{len(active_devices)} devices found"
+        )
+
+        for ip_address in active_devices:
+
+            self.scanner_tree.insert(
+                "",
+                tk.END,
+                values=(
+                    ip_address,
+                    "Active"
+                )
+            )
+
+    # ======================================
+    # Clear Network Scan
+    # ======================================
+
+    def clear_network_scan(
+        self,
+        keep_status=False
+    ):
+
+        if hasattr(
+            self,
+            "scanner_tree"
+        ):
+
+            for item in self.scanner_tree.get_children():
+
+                self.scanner_tree.delete(
+                    item
+                )
+
+        if not keep_status:
+
+            self.scanner_status_var.set(
+                "Ready"
+            )
+
+            self.scanner_count_var.set(
+                "0 devices found"
+            )
+    
+    
     # ======================================
     # Metrics Section
     # ======================================
@@ -227,7 +684,7 @@ class NPATDashboard:
     def create_metrics_section(self):
 
         section = tk.Frame(
-            self.root,
+            self.main_content,
             padx=20,
             pady=5
         )
@@ -262,6 +719,28 @@ class NPATDashboard:
             section,
             "PACKET LOSS",
             self.packet_loss_var
+        ).pack(
+            side="left",
+            expand=True,
+            fill="both",
+            padx=5
+        )
+        
+        self.create_metric_card(
+            section,
+            "DOWNLOAD SPEED",
+            self.download_speed_var
+            ).pack(
+                side="left",
+                expand=True,
+                fill="both",
+                padx=5
+            )
+
+        self.create_metric_card(
+            section,
+            "UPLOAD SPEED",
+            self.upload_speed_var
         ).pack(
             side="left",
             expand=True,
@@ -337,7 +816,7 @@ class NPATDashboard:
     def create_bottom_buttons(self):
 
         section = tk.Frame(
-            self.root,
+            self.main_content,
             padx=25,
             pady=5
         )
@@ -413,7 +892,7 @@ class NPATDashboard:
     def create_chart_section(self):
 
         section = tk.LabelFrame(
-            self.root,
+            self.main_content,
             text="Ping Response Time",
             font=("Arial", 11, "bold"),
             padx=10,
@@ -548,7 +1027,7 @@ class NPATDashboard:
     def create_analysis_section(self):
 
         section = tk.LabelFrame(
-            self.root,
+            self.main_content,
             text="Performance Analysis",
             font=("Arial", 11, "bold"),
             padx=20,
@@ -586,7 +1065,7 @@ class NPATDashboard:
     def create_anomaly_section(self):
 
         section = tk.LabelFrame(
-            self.root,
+            self.main_content,
             text="Anomaly Detection",
             font=("Arial", 11, "bold"),
             padx=20,
@@ -624,7 +1103,7 @@ class NPATDashboard:
     def create_recommendations_section(self):
 
         section = tk.LabelFrame(
-            self.root,
+            self.main_content,
             text="Recommendations",
             font=("Arial", 11, "bold"),
             padx=15,
@@ -703,7 +1182,8 @@ class NPATDashboard:
 
             result = monitor_once(
                 host,
-                count=4
+                count=4,
+                include_bandwidth=True
             )
 
             self.root.after(
@@ -733,6 +1213,19 @@ class NPATDashboard:
         analysis = result["analysis"]
 
         health_score = result["health_score"]
+        
+        bandwidth = result.get(
+            "bandwidth",
+            {}
+        )
+
+        download_speed = bandwidth.get(
+            "download_speed_mbps"
+        )
+
+        upload_speed = bandwidth.get(
+            "upload_speed_mbps"
+        )
 
         anomaly = result.get(
             "anomaly",
@@ -756,13 +1249,19 @@ class NPATDashboard:
             reports_directory,
             exist_ok=True
         )
+        
+        bandwidth = result.get(
+            "bandwidth",
+            {}
+        )
 
         report = generate_text_report(
             result["host"],
             ping_result,
             metrics,
             analysis,
-            recommendations
+            recommendations,
+            bandwidth
         )
 
         text_report_path = os.path.join(
@@ -785,7 +1284,8 @@ class NPATDashboard:
             result["host"],
             ping_result,
             metrics,
-            analysis
+            analysis,
+            bandwidth
         )
 
         # ----------------------------------
@@ -803,6 +1303,42 @@ class NPATDashboard:
         self.packet_loss_var.set(
             f"{metrics['packet_loss']}%"
         )
+        
+        
+        # ----------------------------------
+        # Bandwidth
+        # ----------------------------------
+
+        bandwidth = result.get(
+            "bandwidth",
+            {}
+        )
+
+        download_speed = bandwidth.get(
+            "download_speed_mbps"
+        )
+
+        upload_speed = bandwidth.get(
+            "upload_speed_mbps"
+        )
+
+        if download_speed is not None:
+            self.download_speed_var.set(
+                f"{download_speed:.2f} Mbps"
+            )
+        else:
+            self.download_speed_var.set(
+                "-- Mbps"
+            )
+
+        if upload_speed is not None:
+            self.upload_speed_var.set(
+                f"{upload_speed:.2f} Mbps"
+            )
+        else:
+            self.upload_speed_var.set(
+                "-- Mbps"
+            )
 
         self.overall_var.set(
             analysis["overall_status"]
@@ -1012,6 +1548,8 @@ class NPATDashboard:
                         "latency": record.latency_average,
                         "jitter": record.jitter,
                         "packet_loss": record.packet_loss,
+                        "download_speed": record.download_speed_mbps,
+                        "upload_speed": record.upload_speed_mbps,
                         "health_score": record.health_score,
                         "health_status": record.health_status,
                         "anomaly_detected": record.anomaly_detected,
@@ -1086,6 +1624,8 @@ class NPATDashboard:
             "Latency",
             "Jitter",
             "Packet Loss",
+            "Download Speed",
+            "Upload Speed",
             "Health Score",
             "Health Status",
             "Anomaly",
@@ -1128,6 +1668,16 @@ class NPATDashboard:
         tree.heading(
             "Packet Loss",
             text="Packet Loss (%)"
+        )
+        
+        tree.heading(
+            "Download Speed",
+            text="Download (Mbps)"
+        )
+
+        tree.heading(
+            "Upload Speed",
+            text="Upload (Mbps)"
         )
 
         tree.heading(
@@ -1195,6 +1745,18 @@ class NPATDashboard:
         tree.column(
             "Packet Loss",
             width=110,
+            anchor="center"
+        )
+        
+        tree.column(
+            "Download Speed",
+            width=120,
+            anchor="center"
+        )
+
+        tree.column(
+            "Upload Speed",
+            width=120,
             anchor="center"
         )
 
@@ -1293,6 +1855,16 @@ class NPATDashboard:
                     record["latency"],
                     record["jitter"],
                     record["packet_loss"],
+                    (
+                        f"{record['download_speed']:.2f}"
+                        if record["download_speed"] is not None
+                        else "--"
+                    ),
+                    (
+                        f"{record['upload_speed']:.2f}"
+                        if record["upload_speed"] is not None
+                        else "--"
+                    ),
                     health_score_display,
                     record["health_status"] or "--",
                     (
@@ -1382,7 +1954,82 @@ class NPATDashboard:
 
         trend_window.minsize(
             1000,
-            700
+            850
+        )
+
+        # ----------------------------------
+        # Scrollable Trend Content
+        # ----------------------------------
+
+        trend_scroll_canvas = tk.Canvas(
+            trend_window,
+            highlightthickness=0
+        )
+
+        trend_scrollbar = ttk.Scrollbar(
+            trend_window,
+            orient="vertical",
+            command=trend_scroll_canvas.yview
+        )
+
+        trend_scroll_canvas.configure(
+            yscrollcommand=trend_scrollbar.set
+        )
+
+        trend_scrollbar.pack(
+            side="right",
+            fill="y"
+        )
+
+        trend_scroll_canvas.pack(
+            side="left",
+            fill="both",
+            expand=True
+        )
+
+        trend_content = tk.Frame(
+            trend_scroll_canvas
+        )
+
+        trend_scroll_window = trend_scroll_canvas.create_window(
+            (0, 0),
+            window=trend_content,
+            anchor="nw"
+        )
+
+        def update_trend_scroll_region(event=None):
+
+            trend_scroll_canvas.configure(
+                scrollregion=trend_scroll_canvas.bbox("all")
+            )
+
+        trend_content.bind(
+            "<Configure>",
+            update_trend_scroll_region
+        )
+
+        def resize_trend_content(event):
+
+            trend_scroll_canvas.itemconfigure(
+                trend_scroll_window,
+                width=event.width
+            )
+
+        trend_scroll_canvas.bind(
+            "<Configure>",
+            resize_trend_content
+        )
+
+        def trend_mousewheel(event):
+
+            trend_scroll_canvas.yview_scroll(
+                int(-1 * (event.delta / 120)),
+                "units"
+            )
+
+        trend_window.bind(
+            "<MouseWheel>",
+            trend_mousewheel
         )
 
         # ----------------------------------
@@ -1390,7 +2037,7 @@ class NPATDashboard:
         # ----------------------------------
 
         heading = tk.Label(
-            trend_window,
+            trend_content,
             text="HISTORICAL TREND ANALYSIS",
             font=("Arial", 20, "bold")
         )
@@ -1400,7 +2047,7 @@ class NPATDashboard:
         )
 
         subtitle = tk.Label(
-            trend_window,
+            trend_content,
             text=(
                 "Analysis of recent network performance "
                 "test history"
@@ -1417,7 +2064,7 @@ class NPATDashboard:
         # ----------------------------------
 
         summary_frame = tk.Frame(
-            trend_window,
+            trend_content,
             padx=15,
             pady=5
         )
@@ -1505,7 +2152,7 @@ class NPATDashboard:
         # ----------------------------------
 
         statistics_frame = tk.LabelFrame(
-            trend_window,
+            trend_content,
             text="Historical Statistics",
             font=("Arial", 11, "bold"),
             padx=15,
@@ -1530,7 +2177,7 @@ class NPATDashboard:
             statistics_frame,
             columns=columns,
             show="headings",
-            height=5
+            height=6
         )
 
         for column in columns:
@@ -1594,6 +2241,14 @@ class NPATDashboard:
                 "Health Score",
                 trend_data["health_score"]
             ),
+            (
+                "Download Speed (Mbps)",
+                trend_data["download_speed"]
+            ),
+            (
+                "Upload Speed (Mbps)",
+                trend_data["upload_speed"]
+            ),
         ]
 
         for metric_name, values in statistics_rows:
@@ -1626,7 +2281,7 @@ class NPATDashboard:
         # ----------------------------------
 
         chart_frame = tk.LabelFrame(
-            trend_window,
+            trend_content,
             text="Performance Trends",
             font=("Arial", 11, "bold"),
             padx=10,
@@ -1639,9 +2294,14 @@ class NPATDashboard:
             padx=20,
             pady=5
         )
+        chart_frame.configure(
+            height=360
+        )
+
+        chart_frame.pack_propagate(False)
 
         trend_figure = Figure(
-            figsize=(10, 4.5),
+            figsize=(10, 3.5),
             dpi=100
         )
 
@@ -1664,6 +2324,14 @@ class NPATDashboard:
         health_series = metric_series[
             "health_score"
         ]
+        
+        download_series = metric_series[
+            "download_speed"
+        ]
+
+        upload_series = metric_series[
+            "upload_speed"
+        ]
 
         # Database history is returned newest-first.
         # Reverse it so the chart reads oldest -> newest.
@@ -1682,6 +2350,14 @@ class NPATDashboard:
 
         health_series = list(
             reversed(health_series)
+        )
+        
+        download_series = list(
+            reversed(download_series)
+        )
+        
+        upload_series = list(
+            reversed(upload_series)
         )
 
         test_numbers = list(
@@ -1794,13 +2470,133 @@ class NPATDashboard:
             fill="both",
             expand=True
         )
+        
+        
+        # ----------------------------------
+        # Bandwidth Trend Chart
+        # ----------------------------------
+
+        bandwidth_frame = tk.LabelFrame(
+            trend_content,
+            text="Bandwidth Trends",
+            font=("Arial", 11, "bold"),
+            padx=10,
+            pady=10
+        )
+
+        bandwidth_frame.pack(
+            fill="both",
+            expand=False,
+            padx=20,
+            pady=5
+        )
+        
+        bandwidth_frame.configure(
+            height=320
+        )
+
+        bandwidth_frame.pack_propagate(False)
+
+        bandwidth_figure = Figure(
+            figsize=(10, 3.2),
+            dpi=100
+        )
+
+        bandwidth_ax = bandwidth_figure.add_subplot(
+            111
+        )
+
+        bandwidth_plotted = False
+
+        # ----------------------------------
+        # Download Speed
+        # ----------------------------------
+
+        if any(
+            value is not None
+            for value in download_series
+        ):
+
+            bandwidth_ax.plot(
+                test_numbers,
+                download_series,
+                marker="o",
+                linewidth=2,
+                label="Download Speed (Mbps)"
+            )
+
+            bandwidth_plotted = True
+
+        # ----------------------------------
+        # Upload Speed
+        # ----------------------------------
+
+        if any(
+            value is not None
+            for value in upload_series
+        ):
+
+            bandwidth_ax.plot(
+                test_numbers,
+                upload_series,
+                marker="o",
+                linewidth=2,
+                label="Upload Speed (Mbps)"
+            )
+
+            bandwidth_plotted = True
+
+        bandwidth_ax.set_title(
+            "Download and Upload Speed Trend"
+        )
+
+        bandwidth_ax.set_xlabel(
+            "Test Number"
+        )
+
+        bandwidth_ax.set_ylabel(
+            "Speed (Mbps)"
+        )
+
+        bandwidth_ax.grid(
+            True
+        )
+
+        if bandwidth_plotted:
+
+            bandwidth_ax.legend()
+
+        else:
+
+            bandwidth_ax.text(
+                0.5,
+                0.5,
+                "No historical bandwidth data available",
+                horizontalalignment="center",
+                verticalalignment="center",
+                transform=bandwidth_ax.transAxes
+            )
+
+        bandwidth_figure.tight_layout()
+
+        bandwidth_canvas = FigureCanvasTkAgg(
+            bandwidth_figure,
+            master=bandwidth_frame
+        )
+
+        bandwidth_canvas.draw()
+
+        bandwidth_canvas.get_tk_widget().pack(
+            fill="both",
+            expand=True
+        )
 
         # ----------------------------------
         # Health Score Information
         # ----------------------------------
 
         health_frame = tk.Frame(
-            trend_window,
+            trend_content,
             padx=20,
             pady=8
         )

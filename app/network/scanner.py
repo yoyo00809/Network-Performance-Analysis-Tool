@@ -3,6 +3,7 @@
 # Network Scanner Module
 # ==========================================
 
+import concurrent.futures
 import ipaddress
 import platform
 import subprocess
@@ -29,14 +30,20 @@ def get_local_network():
         output = result.stdout
 
         for line in output.splitlines():
+
             if "IPv4 Address" in line:
+
                 ip_address = line.split(":")[-1].strip()
 
                 # Ignore invalid addresses
                 try:
-                    ip = ipaddress.ip_address(ip_address)
+
+                    ip = ipaddress.ip_address(
+                        ip_address
+                    )
 
                     if ip.is_private:
+
                         network = ipaddress.ip_network(
                             f"{ip_address}/24",
                             strict=False
@@ -67,6 +74,7 @@ def ping_device(ip_address):
     system = platform.system().lower()
 
     if system == "windows":
+
         command = [
             "ping",
             "-n",
@@ -75,7 +83,9 @@ def ping_device(ip_address):
             "1000",
             str(ip_address)
         ]
+
     else:
+
         command = [
             "ping",
             "-c",
@@ -86,6 +96,7 @@ def ping_device(ip_address):
         ]
 
     try:
+
         result = subprocess.run(
             command,
             capture_output=True,
@@ -96,31 +107,65 @@ def ping_device(ip_address):
         return result.returncode == 0
 
     except Exception:
+
         return False
 
 
-def scan_network(network=None):
+def scan_network(
+    network=None,
+    max_workers=32
+):
     """
     Scan a network range and identify reachable devices.
 
+    Multiple hosts are scanned concurrently to reduce
+    the time required for larger networks.
+
     Args:
         network: IPv4 network object.
+        max_workers (int): Maximum number of concurrent
+            ping operations.
 
     Returns:
         list: List of reachable IP addresses.
     """
 
     if network is None:
+
         network = get_local_network()
 
     if network is None:
+
         return []
+
+    ip_addresses = list(
+        network.hosts()
+    )
 
     active_devices = []
 
-    for ip_address in network.hosts():
+    # --------------------------------------
+    # Concurrent Network Scan
+    # --------------------------------------
 
-        if ping_device(ip_address):
-            active_devices.append(str(ip_address))
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=max_workers
+    ) as executor:
+
+        results = executor.map(
+            ping_device,
+            ip_addresses
+        )
+
+        for ip_address, is_active in zip(
+            ip_addresses,
+            results
+        ):
+
+            if is_active:
+
+                active_devices.append(
+                    str(ip_address)
+                )
 
     return active_devices

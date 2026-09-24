@@ -73,6 +73,16 @@ class NetworkTest(db.Model):
         db.Float,
         nullable=True
     )
+    
+    download_speed_mbps = db.Column(
+        db.Float,
+        nullable=True
+    )
+
+    upload_speed_mbps = db.Column(
+        db.Float,
+        nullable=True
+    )
 
     latency_status = db.Column(
         db.String(20),
@@ -227,7 +237,8 @@ def save_network_test(
     analysis,
     health_score=None,
     anomaly=None,
-    failure_recovery=None
+    failure_recovery=None,
+    bandwidth=None
 ):
     """
     Save a network performance test result
@@ -253,6 +264,9 @@ def save_network_test(
 
     if failure_recovery is None:
         failure_recovery = {}
+    
+    if bandwidth is None:
+        bandwidth = {}
 
     anomaly_types = anomaly.get(
         "anomaly_types",
@@ -293,6 +307,14 @@ def save_network_test(
 
         jitter=metrics.get(
             "jitter"
+        ),
+        
+        download_speed_mbps=bandwidth.get(
+            "download_speed_mbps"
+        ),
+
+        upload_speed_mbps=bandwidth.get(
+            "upload_speed_mbps"
         ),
 
         latency_status=analysis.get(

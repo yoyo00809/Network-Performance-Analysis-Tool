@@ -38,6 +38,8 @@ def test_trend_analysis_with_database_history():
         assert "jitter" in result
         assert "packet_loss" in result
         assert "health_score" in result
+        assert "download_speed" in result
+        assert "upload_speed" in result
         assert "availability" in result
         assert "failure_events" in result
         assert "recovery_events" in result
@@ -71,6 +73,8 @@ def test_metric_series_with_database_history():
         assert "jitter" in series
         assert "packet_loss" in series
         assert "health_score" in series
+        assert "download_speed" in series
+        assert "upload_speed" in series
 
         assert (
             len(series["latency"])
@@ -89,5 +93,15 @@ def test_metric_series_with_database_history():
 
         assert (
             len(series["health_score"])
+            == len(records)
+        )
+        
+        assert (
+            len(series["download_speed"])
+            == len(records)
+        )
+
+        assert (
+            len(series["upload_speed"])
             == len(records)
         )

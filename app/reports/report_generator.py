@@ -11,7 +11,8 @@ def generate_text_report(
     ping_result,
     metrics,
     analysis,
-    recommendations
+    recommendations,
+    bandwidth=None
 ):
     """
     Generate a text-based network performance report.
@@ -22,10 +23,14 @@ def generate_text_report(
         metrics (dict): Calculated network metrics.
         analysis (dict): Performance analysis results.
         recommendations (list): Generated recommendations.
+        bandwidth (dict): Download and upload speed results.
 
     Returns:
         str: Formatted text report.
     """
+
+    if bandwidth is None:
+        bandwidth = {}
 
     report_lines = []
 
@@ -111,6 +116,46 @@ def generate_text_report(
     report_lines.append(
         f"Packet Loss      : "
         f"{metrics.get('packet_loss')}%"
+    )
+
+    report_lines.append("")
+
+    # --------------------------------------
+    # Bandwidth
+    # --------------------------------------
+
+    report_lines.append(
+        "--------------- BANDWIDTH -----------------------"
+    )
+
+    download_speed = bandwidth.get(
+        "download_speed_mbps"
+    )
+
+    upload_speed = bandwidth.get(
+        "upload_speed_mbps"
+    )
+
+    if download_speed is not None:
+        download_display = (
+            f"{download_speed:.2f} Mbps"
+        )
+    else:
+        download_display = "Unavailable"
+
+    if upload_speed is not None:
+        upload_display = (
+            f"{upload_speed:.2f} Mbps"
+        )
+    else:
+        upload_display = "Unavailable"
+
+    report_lines.append(
+        f"Download Speed  : {download_display}"
+    )
+
+    report_lines.append(
+        f"Upload Speed    : {upload_display}"
     )
 
     report_lines.append("")
