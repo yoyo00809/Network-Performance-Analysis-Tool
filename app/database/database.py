@@ -201,10 +201,96 @@ class NetworkTest(db.Model):
         nullable=False
     )
 
+# ------------------------------------------
+# Wi-Fi Area Scan Model
+# ------------------------------------------
 
+class WiFiAreaScan(db.Model):
+    """
+    Database model for storing Wi-Fi connectivity
+    measurements for specific physical areas.
+    """
+
+    id = db.Column(
+        db.Integer,
+        primary_key=True
+    )
+
+    location = db.Column(
+        db.String(255),
+        nullable=False
+    )
+
+    ssid = db.Column(
+        db.String(255),
+        nullable=True
+    )
+
+    bssid = db.Column(
+        db.String(50),
+        nullable=True
+    )
+
+    signal_percent = db.Column(
+        db.Float,
+        nullable=True
+    )
+
+    receive_rate_mbps = db.Column(
+        db.Float,
+        nullable=True
+    )
+
+    transmit_rate_mbps = db.Column(
+        db.Float,
+        nullable=True
+    )
+
+    channel = db.Column(
+        db.Integer,
+        nullable=True
+    )
+
+    radio_type = db.Column(
+        db.String(50),
+        nullable=True
+    )
+
+    gateway = db.Column(
+        db.String(50),
+        nullable=True
+    )
+
+    gateway_latency_ms = db.Column(
+        db.Float,
+        nullable=True
+    )
+
+    gateway_packet_loss_percent = db.Column(
+        db.Float,
+        nullable=True
+    )
+
+    download_speed_mbps = db.Column(
+        db.Float,
+        nullable=True
+    )
+
+    upload_speed_mbps = db.Column(
+        db.Float,
+        nullable=True
+    )
+
+    created_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow,
+        nullable=False
+    )
 # ------------------------------------------
 # Create Database
 # ------------------------------------------
+
+
 
 def create_database():
     """
@@ -493,3 +579,194 @@ def test_save_network_test_with_health_score():
         # Clean up test record
         db.session.delete(test)
         db.session.commit()
+        
+# ------------------------------------------
+# Save Wi-Fi Area Scan
+# ------------------------------------------
+
+def save_wifi_area_scan(scan_result):
+    """
+    Save a Wi-Fi area scan result to the database.
+
+    Args:
+        scan_result (dict): Wi-Fi scan result returned
+            by scan_wifi_area().
+
+    Returns:
+        WiFiAreaScan: Saved database record.
+    """
+
+    if scan_result is None:
+        scan_result = {}
+
+    scan = WiFiAreaScan(
+        location=scan_result.get(
+            "location",
+            "Unknown Location"
+        ),
+
+        ssid=scan_result.get(
+            "ssid"
+        ),
+
+        bssid=scan_result.get(
+            "bssid"
+        ),
+
+        signal_percent=scan_result.get(
+            "signal_percent"
+        ),
+
+        receive_rate_mbps=scan_result.get(
+            "receive_rate_mbps"
+        ),
+
+        transmit_rate_mbps=scan_result.get(
+            "transmit_rate_mbps"
+        ),
+
+        channel=scan_result.get(
+            "channel"
+        ),
+
+        radio_type=scan_result.get(
+            "radio_type"
+        ),
+
+        gateway=scan_result.get(
+            "gateway"
+        ),
+
+        gateway_latency_ms=scan_result.get(
+            "gateway_latency_ms"
+        ),
+
+        gateway_packet_loss_percent=scan_result.get(
+            "gateway_packet_loss_percent"
+        ),
+
+        download_speed_mbps=scan_result.get(
+            "download_speed_mbps"
+        ),
+
+        upload_speed_mbps=scan_result.get(
+            "upload_speed_mbps"
+        )
+    )
+
+    db.session.add(scan)
+    db.session.commit()
+
+    return scan
+
+
+# ------------------------------------------
+# Get Wi-Fi Area Scan History
+# ------------------------------------------
+
+def get_wifi_area_history(limit=50):
+    """
+    Retrieve recent Wi-Fi area scan results.
+
+    Args:
+        limit (int): Maximum number of records.
+
+    Returns:
+        list: WiFiAreaScan records.
+    """
+
+    return (
+        WiFiAreaScan.query
+        .order_by(
+            WiFiAreaScan.created_at.desc()
+        )
+        .limit(limit)
+        .all()
+    )
+    
+def compare_wifi_areas(limit=50):
+    """
+    Compare saved Wi-Fi area scans.
+
+    Returns Wi-Fi scan records grouped by location.
+    """
+
+    history = get_wifi_area_history(limit=limit)
+
+    comparison = {}
+
+    for record in history:
+
+        location = record.location or "Unknown Location"
+
+        if location not in comparison:
+            comparison[location] = {
+                "location": location,
+                "signal_percent": [],
+                "gateway_latency_ms": [],
+                "gateway_packet_loss_percent": [],
+                "download_speed_mbps": [],
+                "upload_speed_mbps": []
+            }
+
+        if record.signal_percent is not None:
+            comparison[location]["signal_percent"].append(
+                record.signal_percent
+            )
+
+        if record.gateway_latency_ms is not None:
+            comparison[location]["gateway_latency_ms"].append(
+                record.gateway_latency_ms
+            )
+
+        if record.gateway_packet_loss_percent is not None:
+            comparison[location]["gateway_packet_loss_percent"].append(
+                record.gateway_packet_loss_percent
+            )
+
+        if record.download_speed_mbps is not None:
+            comparison[location]["download_speed_mbps"].append(
+                record.download_speed_mbps
+            )
+
+        if record.upload_speed_mbps is not None:
+            comparison[location]["upload_speed_mbps"].append(
+                record.upload_speed_mbps
+            )
+
+    results = []
+
+    for location, data in comparison.items():
+
+        def average(values):
+            if not values:
+                return None
+
+            return sum(values) / len(values)
+
+        results.append({
+            "location": location,
+            "signal_percent": average(
+                data["signal_percent"]
+            ),
+            "gateway_latency_ms": average(
+                data["gateway_latency_ms"]
+            ),
+            "gateway_packet_loss_percent": average(
+                data["gateway_packet_loss_percent"]
+            ),
+            "download_speed_mbps": average(
+                data["download_speed_mbps"]
+            ),
+            "upload_speed_mbps": average(
+                data["upload_speed_mbps"]
+            ),
+            "scan_count": max(
+                len(data["signal_percent"]),
+                len(data["gateway_latency_ms"]),
+                len(data["download_speed_mbps"]),
+                len(data["upload_speed_mbps"])
+            )
+        })
+
+    return results

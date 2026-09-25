@@ -21,7 +21,11 @@ from app.network.scanner import (
 from app.database.database import (
     create_database,
     get_test_history,
+    save_wifi_area_scan,
+    get_wifi_area_history,
 )
+
+from app.network.wifi_scanner import scan_wifi_area
 
 from app.analysis.trend_analysis import (
     analyze_historical_tests,
@@ -162,6 +166,50 @@ class NPATDashboard:
         self.scanner_count_var = tk.StringVar(
             value="0 devices found"
         )
+        
+        # ----------------------------------
+        # Wi-Fi Area Scanner Variables
+        # ----------------------------------
+
+        self.wifi_location_var = tk.StringVar(
+            value="Current Location"
+        )
+
+        self.wifi_status_var = tk.StringVar(
+            value="Ready"
+        )
+
+        self.wifi_ssid_var = tk.StringVar(
+            value="--"
+        )
+
+        self.wifi_signal_var = tk.StringVar(
+            value="-- %"
+        )
+
+        self.wifi_link_var = tk.StringVar(
+            value="-- / -- Mbps"
+        )
+
+        self.wifi_gateway_var = tk.StringVar(
+            value="--"
+        )
+
+        self.wifi_latency_var = tk.StringVar(
+            value="-- ms"
+        )
+
+        self.wifi_loss_var = tk.StringVar(
+            value="-- %"
+        )
+
+        self.wifi_download_var = tk.StringVar(
+            value="-- Mbps"
+        )
+
+        self.wifi_upload_var = tk.StringVar(
+            value="-- Mbps"
+        )
 
         self.latency_var = tk.StringVar(
             value="-- ms"
@@ -212,6 +260,7 @@ class NPATDashboard:
         self.create_header()
         self.create_input_section()
         self.create_network_scanner_section()
+        self.create_wifi_scanner_section()
         self.create_metrics_section()
         self.create_bottom_buttons()
         self.create_chart_section()
@@ -676,6 +725,432 @@ class NPATDashboard:
                 "0 devices found"
             )
     
+    
+    # ======================================
+    # Wi-Fi Connectivity Area Scanner
+    # ======================================
+
+    def create_wifi_scanner_section(self):
+
+        section = tk.LabelFrame(
+            self.main_content,
+            text="Wi-Fi Connectivity Area Scanner",
+            font=("Arial", 11, "bold"),
+            padx=15,
+            pady=10
+        )
+
+        section.pack(
+            fill="x",
+            padx=25,
+            pady=8
+        )
+
+        # ----------------------------------
+        # Location Input
+        # ----------------------------------
+
+        location_frame = tk.Frame(section)
+
+        location_frame.pack(
+            fill="x",
+            pady=(0, 8)
+        )
+
+        tk.Label(
+            location_frame,
+            text="Area / Location:",
+            font=("Arial", 10, "bold")
+        ).pack(
+            side="left"
+        )
+
+        self.wifi_location_entry = tk.Entry(
+            location_frame,
+            textvariable=self.wifi_location_var,
+            font=("Arial", 10),
+            width=30
+        )
+
+        self.wifi_location_entry.pack(
+            side="left",
+            padx=10
+        )
+
+        self.wifi_scan_button = tk.Button(
+            location_frame,
+            text="SCAN WI-FI AREA",
+            font=("Arial", 10, "bold"),
+            command=self.start_wifi_scan,
+            padx=15,
+            pady=7
+        )
+
+        self.wifi_scan_button.pack(
+            side="left",
+            padx=5
+        )
+        
+        history_button = tk.Button(
+            location_frame,
+            text="VIEW WI-FI HISTORY",
+            font=("Arial", 10, "bold"),
+            command=self.show_wifi_history,
+            padx=15,
+            pady=7
+        )
+
+        history_button.pack(
+            side="left",
+            padx=8
+    )
+        
+        
+        comparison_button = tk.Button(
+        location_frame,
+        text="COMPARE WI-FI AREAS",
+        font=("Arial", 10, "bold"),
+        command=self.show_wifi_comparison,
+        padx=15,
+        pady=7
+    )
+
+        comparison_button.pack(
+            side="left",
+            padx=8
+        )
+
+        tk.Label(
+            location_frame,
+            textvariable=self.wifi_status_var,
+            font=("Arial", 10)
+        ).pack(
+            side="left",
+            padx=15
+        )
+
+        # ----------------------------------
+        # Wi-Fi Information
+        # ----------------------------------
+
+        info_frame = tk.Frame(section)
+
+        info_frame.pack(
+            fill="x",
+            pady=5
+        )
+
+        self.create_wifi_info_row(
+            info_frame,
+            "SSID",
+            self.wifi_ssid_var
+        ).pack(
+            fill="x",
+            pady=2
+        )
+
+        self.create_wifi_info_row(
+            info_frame,
+            "Signal",
+            self.wifi_signal_var
+        ).pack(
+            fill="x",
+            pady=2
+        )
+
+        self.create_wifi_info_row(
+            info_frame,
+            "Wi-Fi Link",
+            self.wifi_link_var
+        ).pack(
+            fill="x",
+            pady=2
+        )
+
+        self.create_wifi_info_row(
+            info_frame,
+            "Gateway",
+            self.wifi_gateway_var
+        ).pack(
+            fill="x",
+            pady=2
+        )
+
+        self.create_wifi_info_row(
+            info_frame,
+            "Gateway Latency",
+            self.wifi_latency_var
+        ).pack(
+            fill="x",
+            pady=2
+        )
+
+        self.create_wifi_info_row(
+            info_frame,
+            "Gateway Packet Loss",
+            self.wifi_loss_var
+        ).pack(
+            fill="x",
+            pady=2
+        )
+
+        self.create_wifi_info_row(
+            info_frame,
+            "Download Speed",
+            self.wifi_download_var
+        ).pack(
+            fill="x",
+            pady=2
+        )
+
+        self.create_wifi_info_row(
+            info_frame,
+            "Upload Speed",
+            self.wifi_upload_var
+        ).pack(
+            fill="x",
+            pady=2
+        )
+
+    # ======================================
+    # Wi-Fi Information Row
+    # ======================================
+
+    def create_wifi_info_row(
+        self,
+        parent,
+        label,
+        variable
+    ):
+
+        frame = tk.Frame(parent)
+
+        tk.Label(
+            frame,
+            text=f"{label}:",
+            font=("Arial", 10, "bold"),
+            width=22,
+            anchor="w"
+        ).pack(
+            side="left"
+        )
+
+        tk.Label(
+            frame,
+            textvariable=variable,
+            font=("Arial", 10),
+            anchor="w"
+        ).pack(
+            side="left"
+        )
+
+        return frame
+
+    # ======================================
+    # Start Wi-Fi Scan
+    # ======================================
+
+    def start_wifi_scan(self):
+
+        if getattr(
+            self,
+            "_wifi_scan_running",
+            False
+        ):
+            return
+
+        location = self.wifi_location_var.get().strip()
+
+        if not location:
+
+            messagebox.showwarning(
+                "Location Required",
+                "Please enter an area or location name."
+            )
+
+            return
+
+        self._wifi_scan_running = True
+
+        self.wifi_scan_button.config(
+            state="disabled",
+            text="SCANNING..."
+        )
+
+        self.wifi_status_var.set(
+            "Scanning Wi-Fi..."
+        )
+
+        wifi_thread = threading.Thread(
+            target=self._run_wifi_scan,
+            args=(location,),
+            daemon=True
+        )
+
+        wifi_thread.start()
+
+    # ======================================
+    # Background Wi-Fi Scan
+    # ======================================
+
+    def _run_wifi_scan(self, location):
+
+        try:
+
+            result = scan_wifi_area(
+                location=location,
+                measure_speed=True
+            )
+            
+            app = create_database()
+
+            with app.app_context():
+                save_wifi_area_scan(result)
+
+            self.root.after(
+                0,
+                lambda: self._wifi_scan_finished(
+                    result
+                )
+            )
+
+        except Exception as error:
+            error_message = str(error)
+            
+            self.root.after(
+                0,
+                lambda: self._wifi_scan_failed(
+                    error_message
+                )
+            )
+
+    # ======================================
+    # Wi-Fi Scan Completion
+    # ======================================
+
+    def _wifi_scan_finished(self, result):
+
+        self._wifi_scan_running = False
+
+        self.wifi_scan_button.config(
+            state="normal",
+            text="SCAN WI-FI AREA"
+        )
+
+        self.wifi_status_var.set(
+            result.get(
+                "status",
+                "Completed"
+            )
+        )
+
+        self.wifi_ssid_var.set(
+            result.get(
+                "ssid"
+            ) or "--"
+        )
+
+        signal = result.get(
+            "signal_percent"
+        )
+
+        self.wifi_signal_var.set(
+            f"{signal} %"
+            if signal is not None
+            else "-- %"
+        )
+
+        receive_rate = result.get(
+            "receive_rate_mbps"
+        )
+
+        transmit_rate = result.get(
+            "transmit_rate_mbps"
+        )
+
+        if (
+            receive_rate is not None
+            and transmit_rate is not None
+        ):
+
+            self.wifi_link_var.set(
+                f"{receive_rate:.1f} / "
+                f"{transmit_rate:.1f} Mbps"
+            )
+
+        else:
+
+            self.wifi_link_var.set(
+                "-- / -- Mbps"
+            )
+
+        self.wifi_gateway_var.set(
+            result.get(
+                "gateway"
+            ) or "--"
+        )
+
+        latency = result.get(
+            "gateway_latency_ms"
+        )
+
+        self.wifi_latency_var.set(
+            f"{latency:.2f} ms"
+            if latency is not None
+            else "-- ms"
+        )
+
+        packet_loss = result.get(
+            "gateway_packet_loss_percent"
+        )
+
+        self.wifi_loss_var.set(
+            f"{packet_loss:.2f} %"
+            if packet_loss is not None
+            else "-- %"
+        )
+
+        download_speed = result.get(
+            "download_speed_mbps"
+        )
+
+        self.wifi_download_var.set(
+            f"{download_speed:.2f} Mbps"
+            if download_speed is not None
+            else "-- Mbps"
+        )
+
+        upload_speed = result.get(
+            "upload_speed_mbps"
+        )
+
+        self.wifi_upload_var.set(
+            f"{upload_speed:.2f} Mbps"
+            if upload_speed is not None
+            else "-- Mbps"
+        )
+
+    # ======================================
+    # Wi-Fi Scan Error
+    # ======================================
+
+    def _wifi_scan_failed(self, error):
+
+        self._wifi_scan_running = False
+
+        self.wifi_scan_button.config(
+            state="normal",
+            text="SCAN WI-FI AREA"
+        )
+
+        self.wifi_status_var.set(
+            "Scan failed"
+        )
+
+        messagebox.showerror(
+            "Wi-Fi Scanner Error",
+            f"Unable to scan Wi-Fi area:\n\n{error}"
+        )
     
     # ======================================
     # Metrics Section
@@ -1522,6 +1997,574 @@ class NPATDashboard:
             f"Test completed for {result['host']}"
         )
 
+
+
+    # ======================================
+    # Wi-Fi Area History Window
+    # ======================================
+
+    def show_wifi_history(self):
+
+        try:
+
+            app = create_database()
+
+            with app.app_context():
+
+                history = get_wifi_area_history(
+                    limit=50
+                )
+
+                history_window = tk.Toplevel(
+                    self.root
+                )
+
+                history_window.title(
+                    "Wi-Fi Area History"
+                )
+
+                history_window.geometry(
+                    "1000x500"
+                )
+
+                history_window.minsize(
+                    900,
+                    400
+                )
+
+                # ----------------------------------
+                # Header
+                # ----------------------------------
+
+                tk.Label(
+                    history_window,
+                    text="Wi-Fi Area History",
+                    font=("Arial", 16, "bold")
+                ).pack(
+                    pady=(15, 5)
+                )
+
+                tk.Label(
+                    history_window,
+                    text="Recent Wi-Fi connectivity measurements",
+                    font=("Arial", 10)
+                ).pack(
+                    pady=(0, 10)
+                )
+
+                # ----------------------------------
+                # Table Frame
+                # ----------------------------------
+
+                table_frame = tk.Frame(
+                    history_window
+                )
+
+                table_frame.pack(
+                    fill="both",
+                    expand=True,
+                    padx=15,
+                    pady=10
+                )
+
+                columns = (
+                    "location",
+                    "ssid",
+                    "signal",
+                    "latency",
+                    "packet_loss",
+                    "download",
+                    "upload"
+                )
+
+                history_tree = ttk.Treeview(
+                    table_frame,
+                    columns=columns,
+                    show="headings"
+                )
+
+                history_tree.heading(
+                    "location",
+                    text="Location"
+                )
+
+                history_tree.heading(
+                    "ssid",
+                    text="SSID"
+                )
+
+                history_tree.heading(
+                    "signal",
+                    text="Signal"
+                )
+
+                history_tree.heading(
+                    "latency",
+                    text="Gateway Latency"
+                )
+
+                history_tree.heading(
+                    "packet_loss",
+                    text="Gateway Loss"
+                )
+
+                history_tree.heading(
+                    "download",
+                    text="Download"
+                )
+
+                history_tree.heading(
+                    "upload",
+                    text="Upload"
+                )
+
+                history_tree.column(
+                    "location",
+                    width=150,
+                    anchor="center"
+                )
+
+                history_tree.column(
+                    "ssid",
+                    width=180,
+                    anchor="center"
+                )
+
+                history_tree.column(
+                    "signal",
+                    width=90,
+                    anchor="center"
+                )
+
+                history_tree.column(
+                    "latency",
+                    width=120,
+                    anchor="center"
+                )
+
+                history_tree.column(
+                    "packet_loss",
+                    width=110,
+                    anchor="center"
+                )
+
+                history_tree.column(
+                    "download",
+                    width=110,
+                    anchor="center"
+                )
+
+                history_tree.column(
+                    "upload",
+                    width=110,
+                    anchor="center"
+                )
+
+                # ----------------------------------
+                # Scrollbar
+                # ----------------------------------
+
+                scrollbar = ttk.Scrollbar(
+                    table_frame,
+                    orient="vertical",
+                    command=history_tree.yview
+                )
+
+                history_tree.configure(
+                    yscrollcommand=scrollbar.set
+                )
+
+                history_tree.pack(
+                    side="left",
+                    fill="both",
+                    expand=True
+                )
+
+                scrollbar.pack(
+                    side="right",
+                    fill="y"
+                )
+
+                # ----------------------------------
+                # Insert History
+                # ----------------------------------
+
+                for record in history:
+
+                    signal = (
+                        f"{record.signal_percent:.1f}%"
+                        if record.signal_percent is not None
+                        else "--"
+                    )
+
+                    latency = (
+                        f"{record.gateway_latency_ms:.2f} ms"
+                        if record.gateway_latency_ms is not None
+                        else "--"
+                    )
+
+                    packet_loss = (
+                        f"{record.gateway_packet_loss_percent:.1f}%"
+                        if record.gateway_packet_loss_percent is not None
+                        else "--"
+                    )
+
+                    download = (
+                        f"{record.download_speed_mbps:.2f} Mbps"
+                        if record.download_speed_mbps is not None
+                        else "--"
+                    )
+
+                    upload = (
+                        f"{record.upload_speed_mbps:.2f} Mbps"
+                        if record.upload_speed_mbps is not None
+                        else "--"
+                    )
+
+                    history_tree.insert(
+                        "",
+                        tk.END,
+                        values=(
+                            record.location,
+                            record.ssid or "--",
+                            signal,
+                            latency,
+                            packet_loss,
+                            download,
+                            upload
+                        )
+                    )
+
+                # ----------------------------------
+                # Empty History
+                # ----------------------------------
+
+                if not history:
+
+                    history_tree.insert(
+                        "",
+                        tk.END,
+                        values=(
+                            "No Wi-Fi scans",
+                            "--",
+                            "--",
+                            "--",
+                            "--",
+                            "--",
+                            "--"
+                        )
+                    )
+
+                # ----------------------------------
+                # Close Button
+                # ----------------------------------
+
+                tk.Button(
+                    history_window,
+                    text="CLOSE",
+                    font=("Arial", 10, "bold"),
+                    command=history_window.destroy,
+                    padx=20,
+                    pady=7
+                ).pack(
+                    pady=(5, 15)
+                )
+
+        except Exception as error:
+
+            messagebox.showerror(
+                "Wi-Fi History Error",
+                f"Unable to load Wi-Fi history:\n\n{error}"
+            )
+    
+    
+        # ======================================
+    # Wi-Fi Area Comparison Window
+    # ======================================
+
+    def show_wifi_comparison(self):
+
+        try:
+
+            app = create_database()
+
+            with app.app_context():
+
+                from app.database.database import compare_wifi_areas
+
+                comparison = compare_wifi_areas(
+                    limit=50
+                )
+
+                comparison_window = tk.Toplevel(
+                    self.root
+                )
+
+                comparison_window.title(
+                    "Wi-Fi Area Comparison"
+                )
+
+                comparison_window.geometry(
+                    "1100x550"
+                )
+
+                comparison_window.minsize(
+                    950,
+                    450
+                )
+
+                # ----------------------------------
+                # Header
+                # ----------------------------------
+
+                tk.Label(
+                    comparison_window,
+                    text="Wi-Fi Area Comparison",
+                    font=("Arial", 16, "bold")
+                ).pack(
+                    pady=(15, 5)
+                )
+
+                tk.Label(
+                    comparison_window,
+                    text="Comparison of saved Wi-Fi performance measurements",
+                    font=("Arial", 10)
+                ).pack(
+                    pady=(0, 10)
+                )
+
+                # ----------------------------------
+                # Table Frame
+                # ----------------------------------
+
+                table_frame = tk.Frame(
+                    comparison_window
+                )
+
+                table_frame.pack(
+                    fill="both",
+                    expand=True,
+                    padx=15,
+                    pady=10
+                )
+
+                columns = (
+                    "location",
+                    "signal",
+                    "latency",
+                    "packet_loss",
+                    "download",
+                    "upload",
+                    "scans"
+                )
+
+                comparison_tree = ttk.Treeview(
+                    table_frame,
+                    columns=columns,
+                    show="headings"
+                )
+
+                # ----------------------------------
+                # Headings
+                # ----------------------------------
+
+                comparison_tree.heading(
+                    "location",
+                    text="Location"
+                )
+
+                comparison_tree.heading(
+                    "signal",
+                    text="Avg Signal"
+                )
+
+                comparison_tree.heading(
+                    "latency",
+                    text="Avg Gateway Latency"
+                )
+
+                comparison_tree.heading(
+                    "packet_loss",
+                    text="Avg Gateway Loss"
+                )
+
+                comparison_tree.heading(
+                    "download",
+                    text="Avg Download"
+                )
+
+                comparison_tree.heading(
+                    "upload",
+                    text="Avg Upload"
+                )
+
+                comparison_tree.heading(
+                    "scans",
+                    text="Scans"
+                )
+
+                # ----------------------------------
+                # Column Widths
+                # ----------------------------------
+
+                comparison_tree.column(
+                    "location",
+                    width=180,
+                    anchor="center"
+                )
+
+                comparison_tree.column(
+                    "signal",
+                    width=110,
+                    anchor="center"
+                )
+
+                comparison_tree.column(
+                    "latency",
+                    width=160,
+                    anchor="center"
+                )
+
+                comparison_tree.column(
+                    "packet_loss",
+                    width=150,
+                    anchor="center"
+                )
+
+                comparison_tree.column(
+                    "download",
+                    width=140,
+                    anchor="center"
+                )
+
+                comparison_tree.column(
+                    "upload",
+                    width=130,
+                    anchor="center"
+                )
+
+                comparison_tree.column(
+                    "scans",
+                    width=80,
+                    anchor="center"
+                )
+
+                # ----------------------------------
+                # Scrollbar
+                # ----------------------------------
+
+                scrollbar = ttk.Scrollbar(
+                    table_frame,
+                    orient="vertical",
+                    command=comparison_tree.yview
+                )
+
+                comparison_tree.configure(
+                    yscrollcommand=scrollbar.set
+                )
+
+                comparison_tree.pack(
+                    side="left",
+                    fill="both",
+                    expand=True
+                )
+
+                scrollbar.pack(
+                    side="right",
+                    fill="y"
+                )
+
+                # ----------------------------------
+                # Insert Comparison Data
+                # ----------------------------------
+
+                for record in comparison:
+
+                    signal = (
+                        f"{record['signal_percent']:.1f}%"
+                        if record["signal_percent"] is not None
+                        else "--"
+                    )
+
+                    latency = (
+                        f"{record['gateway_latency_ms']:.2f} ms"
+                        if record["gateway_latency_ms"] is not None
+                        else "--"
+                    )
+
+                    packet_loss = (
+                        f"{record['gateway_packet_loss_percent']:.1f}%"
+                        if record["gateway_packet_loss_percent"] is not None
+                        else "--"
+                    )
+
+                    download = (
+                        f"{record['download_speed_mbps']:.2f} Mbps"
+                        if record["download_speed_mbps"] is not None
+                        else "--"
+                    )
+
+                    upload = (
+                        f"{record['upload_speed_mbps']:.2f} Mbps"
+                        if record["upload_speed_mbps"] is not None
+                        else "--"
+                    )
+
+                    comparison_tree.insert(
+                        "",
+                        tk.END,
+                        values=(
+                            record["location"],
+                            signal,
+                            latency,
+                            packet_loss,
+                            download,
+                            upload,
+                            record["scan_count"]
+                        )
+                    )
+
+                # ----------------------------------
+                # Empty Comparison
+                # ----------------------------------
+
+                if not comparison:
+
+                    comparison_tree.insert(
+                        "",
+                        tk.END,
+                        values=(
+                            "No Wi-Fi data",
+                            "--",
+                            "--",
+                            "--",
+                            "--",
+                            "--",
+                            "0"
+                        )
+                    )
+
+                # ----------------------------------
+                # Close Button
+                # ----------------------------------
+
+                tk.Button(
+                    comparison_window,
+                    text="CLOSE",
+                    font=("Arial", 10, "bold"),
+                    command=comparison_window.destroy,
+                    padx=20,
+                    pady=7
+                ).pack(
+                    pady=(5, 15)
+                )
+
+        except Exception as error:
+
+            messagebox.showerror(
+                "Wi-Fi Comparison Error",
+                f"Unable to load Wi-Fi comparison:\n\n{error}"
+            )
     # ======================================
     # Test History Window
     # ======================================
